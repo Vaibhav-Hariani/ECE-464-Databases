@@ -1,0 +1,2 @@
+##Has all required packages
+Flask-SQLAlchemy
