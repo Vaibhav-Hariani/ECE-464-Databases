@@ -1,0 +1,97 @@
+1.1
+Query:     
+SELECT boats.bid, boats.bname, COUNT(boats.bid) 
+        FROM reserves JOIN boats ON boats.bid=reserves.bid 
+        GROUP BY reserves.bid, boats.bname;
+Result:
+    |bid|bname               |count|
+    |---|--------------------|-----|List those sailors who have reserved only red boats.
+    For which boat are there the most reservations?
+    Select all sailors who have never reserved a red boat.
+    Find the average age of sailors with a rating of 10.
+    For each rating, find the name and id of the youngest sailor.
+    Select, for each boat, the sailor who made the highest number of reservations for that boat.
+    
+    |105|Marine              |3    |
+    |104|Clipper             |5    |
+    |112|Sooney              |1    |
+    |103|Clipper             |3    |
+    |101|Interlake           |2    |
+    |102|Interlake           |3    |
+    |108|Driftwood           |1    |
+    |109|Driftwood           |4    |
+    |110|Klapser             |3    |
+    |107|Marine              |1    |
+    |111|Sooney              |1    |
+    |106|Marine              |3    |
+
+1.2
+Query:
+select sailors.sname, sailors.sid from reserves
+	inner join boats
+		on boats.bid = reserves.bid
+	inner join sailors 
+		on sailors.sid = reserves.sid
+	where boats.color = 'red'
+	group by sailors.sid
+	having COUNT(boats.bid) = (select distinct COUNT(boats.bid) from boats where boats.color = 'red');
+Result:
+    |sname|sid|
+    |-----|---|
+
+1.3
+Query:
+    select sailors.sname, sailors.sid from reserves r
+        inner join boats b
+            on b.bid=r.bid
+        inner join sailors 
+            on sailors.sid = r.sid
+        where b.color = 'red' and sailors.sid not in (select r.sid from reserves r inner join boats b on b.bid=r.bid where b.color != 'red')
+        group by sailors.sid
+
+Result:
+    |sname   |sid|
+    |--------|---|
+    |emilio  |23 |
+    |scruntus|24 |
+    |figaro  |35 |
+    |ossola  |61 |
+    |shaun   |62 |
+ 
+1.4
+Query:
+select reserves.bid, COUNT(reserves.bid) from reserves group by reserves.bid order by COUNT(reserves.bid) desc limit 1
+Result:
+    |bid|count|
+    |---|-----|
+    |104|5    |
+
+
+1.5
+Query:
+    select sailors.sname, sailors.sid from sailors where 
+	sailors.sid not in (select r.sid from reserves r inner join boats b on b.bid = r.bid where b.color = 'red')
+Result:
+    |sname  |sid|
+    |-------|---|
+    |brutus |29 |
+    |andy   |32 |
+    |rusty  |58 |
+    |zorba  |71 |
+    |horatio|74 |
+    |art    |85 |
+    |bob    |95 |
+    |jit    |60 |
+    |vin    |90 |
+    |joe    |99 |
+
+1.6
+Query:
+select AVG(sailors.age) from sailors where
+	sailors.rating = 10
+Result:
+    |avg|
+    |---|
+    |35 |
+
+1.7
