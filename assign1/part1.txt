@@ -2,7 +2,7 @@
 Query:     
 SELECT boats.bid, boats.bname, COUNT(boats.bid) 
         FROM reserves JOIN boats ON boats.bid=reserves.bid 
-        GROUP BY reserves.bid, boats.bname;
+        GROUP BY reserves.bid, boats.bname, boats.bid;
 Result:
     |bid|bname               |count|
     |---|--------------------|-----|List those sailors who have reserved only red boats.

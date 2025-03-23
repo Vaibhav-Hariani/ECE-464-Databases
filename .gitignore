@@ -1,0 +1,2 @@
+##Exclude all docker persistents 
+*/pgdata
