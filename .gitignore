@@ -1,2 +1,3 @@
 ##Exclude all docker persistents 
 */pgdata
+__pycache__

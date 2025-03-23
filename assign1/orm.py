@@ -6,6 +6,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, backref, relationship
 from sqlalchemy import Integer, String, Column, DateTime,ForeignKey, PrimaryKeyConstraint
 
+engine = create_engine('postgresql+psycopg2://postgres:example@localhost:5432', echo=True)
+conn = engine.connect()
+
 Base = declarative_base()
 
 class Sailor(Base):
@@ -49,8 +52,6 @@ class Reservation(Base):
 
 
 if __name__ == "__main__":
-    engine = create_engine('postgresql+psycopg2://postgres:example@localhost:5432', echo=True)
-    conn = engine.connect()
-    print("Sucessfully Connected ")
     print(conn.execute(text("SELECT * from sailors")).fetchall())
+    print("Sucessfully Connected ")
     
