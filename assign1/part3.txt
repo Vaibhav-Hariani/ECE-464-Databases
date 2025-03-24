@@ -1,0 +1,19 @@
+A few things the Business is missing: 
+
+No way to verify a reservation is valid (A boat is available 
+and a sailor is not scheduled at the same time)
+
+By extension, there is no way for a boat to be 
+available/in repairs/retired. This can cause issues.
+
+No way to invoice/track total boat usage for billing by sailor/client.
+In addition, no way to track boat hours for maintenence & support.
+
+
+A simple extension to solve all of these would be a "status"
+tag in the boat table, and "duration" field in the reservations.
+
+This duration field could then be summed for each sailor weekly, creating a cost.
+
+If different boats have different capabilities and therefore different rates,
+A rate field for each boat would make aggregating for invoices very very easy.

@@ -34,7 +34,9 @@ select sailors.sname, sailors.sid from reserves
 		on sailors.sid = reserves.sid
 	where boats.color = 'red'
 	group by sailors.sid
-	having COUNT(boats.bid) = (select distinct COUNT(boats.bid) from boats where boats.color = 'red');
+	having COUNT(boats.bid) = 
+        (select distinct COUNT(boats.bid)
+        from boats where boats.color = 'red');
 Result:
     |sname|sid|
     |-----|---|
@@ -46,7 +48,10 @@ Query:
             on b.bid=r.bid
         inner join sailors 
             on sailors.sid = r.sid
-        where b.color = 'red' and sailors.sid not in (select r.sid from reserves r inner join boats b on b.bid=r.bid where b.color != 'red')
+        where b.color = 'red' and sailors.sid not in 
+            (select r.sid from reserves r 
+            inner join boats b on b.bid=r.bid 
+            where b.color != 'red')
         group by sailors.sid
 
 Result:
@@ -60,7 +65,10 @@ Result:
  
 1.4
 Query:
-select reserves.bid, COUNT(reserves.bid) from reserves group by reserves.bid order by COUNT(reserves.bid) desc limit 1
+select reserves.bid, COUNT(reserves.bid) from reserves 
+group by reserves.bid 
+    order by COUNT(reserves.bid) 
+    desc limit 1
 Result:
     |bid|count|
     |---|-----|
@@ -70,7 +78,9 @@ Result:
 1.5
 Query:
     select sailors.sname, sailors.sid from sailors where 
-	sailors.sid not in (select r.sid from reserves r inner join boats b on b.bid = r.bid where b.color = 'red')
+	sailors.sid not in (select r.sid from reserves r 
+        inner join boats b on b.bid = r.bid 
+        where b.color = 'red')
 Result:
     |sname  |sid|
     |-------|---|
@@ -94,4 +104,17 @@ Result:
     |---|
     |35 |
 
-1.7
+--This doesn't break ties
+--1.7
+select s.sname, s.age, s.rating from sailors s
+    where age = (select MIN(age) from sailors s2 where s.rating = s2.rating) 
+    group by s.rating, s.sname, s.age;
+
+--1.8
+select sailors.sname, sailors.sid, COUNT(*) as reservationcount from reserves r 
+	join sailors 
+	on sailors.sid = r.sid, reservationcount = r.reservationcount 
+	group by sailors.sname, sailors.sid
+	where reservationcount = (select COUNT(reserves.sid) 
+    as reservationcount, reserves.bid 
+    from reserves group by reserves.bid, reserves.sid);
