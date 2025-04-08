@@ -1,14 +1,24 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import MappedAsDataclass
-from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
+import flask
+from flask import request
 
+from objects import *
 
-class Base(MappedAsDataclass, DeclarativeBase):
-    pass
+@app.route("/create_user", methods=['POST'])
+def create_user():
+    error=None
+    uid = None
+    ##Need to implement a security layer to guarantee 
+    # this is a valid request. 
 
+    try:
+        type = request.form['obj_class']
+        
+    
+##safety function
+def create_student(data: dict):
+    student = StudentData(data['name'], data['email'])
+    db.session.add(student)
+    Login = StudentLogin(data['uname'],data['pass'], student.id)
+    db.session.add(Login)
+    return Login.id
 
-db = SQLAlchemy(model_class=Base)
