@@ -1,2 +1,6 @@
-##Has all required packages
+##ORM
 SqlAlchemy
+##UI
+streamlit
+##Optional: Only necessary for data generation
+wonderwords
