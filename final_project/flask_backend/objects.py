@@ -10,7 +10,7 @@ app = Flask(__name__)
 ##Will likely switch to postgres at a later date
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config["SQLALCHEMYDATABASE_URI"] = "sqlite:///" + os.path.join(
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
     basedir, "database.db"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -111,6 +111,7 @@ class Assignment_Grade:
 
 
 if __name__ == "__main__":
+    print(app.config["SQLALCHEMY_DATABASE_URI"])
     with app.app_context():
         ##Create all the models
         db.create_all()
