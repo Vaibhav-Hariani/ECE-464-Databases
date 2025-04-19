@@ -10,8 +10,11 @@ from sqlalchemy.orm import (
     Session,
     sessionmaker,
 )
+basedir = os.path.abspath(os.path.dirname(__file__))
+DB_PATH="sqlite:///" + os.path.join(
+    basedir, "database.db")
 
-engine = create_engine("sqlite://", echo=False)
+engine = create_engine(DB_PATH, echo=False)
 Session = sessionmaker(engine)
 ##Postgre: postgresql://username:password@host:port/database_name
 

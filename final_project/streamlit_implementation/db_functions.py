@@ -22,30 +22,37 @@ def create_user(args):
         case "professor":
             uid = create_professor(args)
         case _:
-            return (-1, 400)
+            return (-1, -2)
     if uid < 0:
-        return ("Data Already Exists!", 405)
-    login = Login(args["uname"], args["pass"], type, uid)
+        return ("User already exists!",-1)
+    try:
+        login = Login(uname=args["uname"], password=args["pass"], type=type, uid=uid)
+    except IntegrityError:
+        return ("Invalid Username",1)
     with Session.begin() as session:
         session.add(login)
-    return uid
+    return (uid,1)
 
 
 def create_student(data: dict):
-    with Session.begin() as session:
+    id = 0
+    with Session() as session:
         try:
             student = StudentData(name=data["name"], email=data["email"])
             session.add(student)
+            session.commit()
             return student.id
         except IntegrityError:
             return -1
 
 
+
 def create_dean(data: dict):
-    with Session.begin() as session:
+    with Session() as session:
         try:
             dean = DeanData(data["name"], data["email"], data["major_id"])
             session.add(dean)
+            session.commit()
             return dean.id
         except IntegrityError:
             return -1
@@ -53,20 +60,36 @@ def create_dean(data: dict):
 
 ##safety function
 def create_professor(data: dict):
-    with Session.begin() as session:
+    with Session() as session:
         try:
-            prof = ProfessorData(data["name"], data["email"], data["major_id"])
+            prof = ProfessorData(name=data["name"], email=data["email"])
             session.add(prof)
+            session.commit()
             return prof.id
         except IntegrityError:
             return -1
 
+def table_loader(Table_Label: str) -> list[StudentData] | list [ProfessorData] | list [DeanData]:
+    with Session() as session:
+        stmt = select('*').select_from(Tables[Table_Label])
+        return session.execute(stmt).fetchall()
 
-def login(args):
-    udata = select(Login).where(
-        Login.uname == args["uname"] and Login.password == args["password"]
+
+##This function is just for testing
+def get_login(uid) -> Login:
+    with Session() as session:
+        stmt = select('*').where(Login.uid == uid)
+        element = session.execute(stmt).fetchone()
+        return element
+
+
+def login(uname,password):
+    udata = select(Login.uid).where(
+        Login.uname == uname, Login.password == password
     )
-    if len(login <= 1):
-        return ("Username or Password is incorrect", 405)
-    user = udata[0]
-    print(user)
+    person = None
+    with Session() as session:
+        id = session.execute(udata).fetchone()
+        if id is None:
+            return ("Username or Password is incorrect", -1)
+        return id
