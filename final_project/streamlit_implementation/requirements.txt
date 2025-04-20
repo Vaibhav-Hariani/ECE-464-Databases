@@ -2,5 +2,6 @@
 SqlAlchemy
 ##UI
 streamlit
+st_pages
 ##Optional: Only necessary for data generation
 wonderwords

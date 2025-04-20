@@ -92,4 +92,10 @@ def login(uname,password):
         id = session.execute(udata).fetchone()
         if id is None:
             return ("Username or Password is incorrect", -1)
-        return id
+        ##Should actually return a session token
+        return (id, 0)
+    
+def session_token_ass(uid):
+    if()
+    with Session() as session:
+        pass
