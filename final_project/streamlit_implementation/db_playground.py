@@ -1,6 +1,6 @@
 ##Quick script to populate and test database creation by hammering it with an array
 import db_functions
-
+from db_objects import *
 PAGE = "http://127.0.0.1:5000"
 import random
 import string
@@ -106,9 +106,9 @@ def populate_students(NUM_STUDENTS=21):
         response = db_functions.create_user(element)
         print(response)
 
-def login_test(student):
+def login_test(student: StudentData):
     print(student)
-    subject_creds = db_functions.get_login(student.id)
+    subject_creds = db_functions.get_login(student.id, "student")
     print(subject_creds)
     new_pass = subject_creds.password + '@'
     print(db_functions.login(subject_creds.uname, subject_creds.password))
@@ -140,11 +140,11 @@ def populate_professors():
 if __name__ == "__main__":
     # populate_students()
     Students = db_functions.table_loader("Student")
-    populate_professors()
+    # populate_professors()
     Professors = db_functions.table_loader("Professor")
     for prof in Professors:
         print(prof)
-        login = db_functions.get_login(prof.id)
+        login = db_functions.get_login(prof.id, "professor")
         print(login.id)
     login_test(Students[-1])
     print("Done printing students")

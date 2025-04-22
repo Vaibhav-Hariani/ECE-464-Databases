@@ -1,7 +1,7 @@
 import os
 import datetime
 from typing import List
-from sqlalchemy import DateTime, create_engine, ForeignKey
+from sqlalchemy import DateTime, String, create_engine, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import (
     Mapped,
@@ -35,9 +35,7 @@ class Login(Base):
     password: Mapped[str]
     type: Mapped[str]
     uid: Mapped[int]
-    token: Mapped[List["SessionToken"]] = relationship(
-        "session_token", back_populates="Login", cascade="all, delete-orphan"
-    )
+    token: Mapped["SessionToken"] = relationship(back_populates="login")
 
 
 class StudentData(Base):
@@ -112,20 +110,22 @@ class AssignmentGrade(Base):
     student_course_layer_id: Mapped[int]
 
 
+def set_session_time():
+    return datetime.datetime.now() + datetime.timedelta(hours=2)
+ 
+
 class SessionToken(Base):
     __tablename__ = "session_token"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    token_key: Mapped[str] = mapped_column(String(64))
     active: Mapped[bool] = mapped_column(default=True)
-    uid: Mapped[int] = mapped_column(ForeignKey("Login.id"))
-    login_obj: Mapped[Login] = relationship("Login", back_populates="session_token")
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True))
+    login: Mapped["Login"] = relationship("Login",back_populates="token")
+    uid: Mapped[int] = mapped_column(ForeignKey("login.id"))
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=set_session_time())
 
     def is_expired(self) -> bool:
         """Checks if the token has expired."""
-        return datetime.datetime.now(datetime.timezone.utc) > self.expires_at
+        return datetime.datetime.now() > self.expires_at
 
 
 

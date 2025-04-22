@@ -1,6 +1,6 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
-
+import secrets
 from final_project.streamlit_implementation.db_objects import *
 
 
@@ -22,16 +22,17 @@ def create_user(args):
         case "professor":
             uid = create_professor(args)
         case _:
-            return (-1, -2)
+            return ("-1", -2)
     if uid < 0:
         return ("User already exists!",-1)
     try:
         login = Login(uname=args["uname"], password=args["pass"], type=type, uid=uid)
+        with Session.begin() as session:
+            session.add(login)
+            create_session_token(login,session)
     except IntegrityError:
         return ("Invalid Username",1)
-    with Session.begin() as session:
-        session.add(login)
-    return (uid,1)
+    return (uid,0)
 
 
 def create_student(data: dict):
@@ -76,26 +77,43 @@ def table_loader(Table_Label: str) -> list[StudentData] | list [ProfessorData] |
 
 
 ##This function is just for testing
-def get_login(uid) -> Login:
+def get_login(uid,type) -> Login:
     with Session() as session:
-        stmt = select('*').where(Login.uid == uid)
+        stmt = select('*').where(Login.uid == uid).where(Login.type == type)
         element = session.execute(stmt).fetchone()
         return element
 
+def create_session_token(login_obj: Login,session):
+    token_key= secrets.token_bytes(64)
+    creation_time = datetime.datetime.now(datetime.timezone.utc) 
+    expiration = creation_time + datetime.timedelta(hours=2)
+    token = SessionToken(token_key=token_key, uid=Login.id, expires_at=expiration)
+    session.add(token)
+    login_obj.token = token
+    return token_key
+
+def extend_token(token: SessionToken):
+    token.expires_at += datetime.timedelta(hours=2)
 
 def login(uname,password):
-    udata = select(Login.uid).where(
+    udata = select(Login).where(
         Login.uname == uname, Login.password == password
     )
-    person = None
+    # person = None
     with Session() as session:
-        id = session.execute(udata).fetchone()
-        if id is None:
+        first_el = session.execute(udata).fetchone()
+        if first_el is None:
             return ("Username or Password is incorrect", -1)
-        ##Should actually return a session token
-        return (id, 0)
+        ##Should actually return a session token\
+        login = first_el.Login
+
+        # token = login_obj.token
+        if (not login.token.active) or login.token.is_expired():
+            create_session_token(login,session)
+            session.commit()
+        return (login.token, 0)
     
-def session_token_ass(uid):
-    if()
-    with Session() as session:
-        pass
+# def session_token_ass(uid):
+#     if()
+#     with Session() as session:
+#         pass
