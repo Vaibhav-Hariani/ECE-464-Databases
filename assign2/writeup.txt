@@ -1,0 +1,17 @@
+1a)
+Effectively, just have the scraper. Using redis as a NOSQL db, 
+scraping the books.toscrape website as it's structured and simple enough
+Broke my code up into segments for both readability and programmability.
+
+I'm using the sentence-transformers library to generate embeddings as we 
+used it for Deep Learning and it's a pretty convenient model
+
+I scrape the site by iterating over the categories,
+then the tiles within each page, 
+and then the pages for each category.
+
+This makes life pretty easy. 
+
+I'm storing my data in Redis, I use a dict so that I can access each element individually
+Makes things pretty clean, and I have vectors as another component as dictated by the redis guide
+My keys are the UPC for each book, as I thought that makes sense, even if I'm not necessarily using them
