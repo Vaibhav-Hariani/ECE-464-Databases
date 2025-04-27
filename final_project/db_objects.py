@@ -1,14 +1,12 @@
 import os
 import datetime
-from typing import List
+from typing import List, Optional
 from sqlalchemy import DateTime, String, create_engine, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     DeclarativeBase,
-    MappedAsDataclass,
-    Session,
     sessionmaker,
     relationship,
 )
@@ -17,7 +15,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = "sqlite:///" + os.path.join(basedir, "database.db")
 
 engine = create_engine(DB_PATH, echo=False)
-Session = sessionmaker(engine)
+Session = sessionmaker(engine,expire_on_commit=False)
 ##Postgre: postgresql://username:password@host:port/database_name
 
 
@@ -50,6 +48,8 @@ class ProfessorData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
+    major_id: Mapped[int]
+
 
 
 class DeanData(Base):
@@ -63,8 +63,8 @@ class DeanData(Base):
 class CourseArchetype(Base):
     __tablename__ = "course_archetype"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    course_name: Mapped[str]
-    course_code: Mapped[str]
+    course_name: Mapped[str] = mapped_column(unique=True)
+    course_code: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
 
 
@@ -77,10 +77,10 @@ class Semesters(Base):
 class Course(Base):
     __tablename__ = "course"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    running: Mapped[bool]
+    running: Mapped[bool] = mapped_column(default=True)
     prof_id: Mapped[int]
     course_id: Mapped[int]
-    section_id: Mapped[int]
+    section: Mapped[str]
     semester_id: Mapped[int]
     course_breakdown: Mapped[str]
 
@@ -125,7 +125,7 @@ class SessionToken(Base):
 
     def is_expired(self) -> bool:
         """Checks if the token has expired."""
-        return datetime.datetime.now() > self.expires_at
+        return self.active and datetime.datetime.now() > self.expires_at
 
 
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # with Session(engine) as session:
     #     pass
 
-    # print(app.config["SQLALCHEMY_DATABASE_URI"])
+    # print(app.config["SQLALCHEMY_DATABASE_URI"])1290
     # with app.app_context():
     #     ##Create all the models
     #     db.create_all()

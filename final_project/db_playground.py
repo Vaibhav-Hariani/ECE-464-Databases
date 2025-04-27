@@ -111,7 +111,10 @@ def login_test(student: StudentData):
     subject_creds = db_functions.get_login(student.id, "student")
     print(subject_creds)
     new_pass = subject_creds.password + '@'
-    print(db_functions.login(subject_creds.uname, subject_creds.password))
+    successful_login = db_functions.login(subject_creds.uname, subject_creds.password)
+    print(successful_login[1])
+    user = db_functions.get_user(successful_login[0].token_key)
+    print(user.StudentData.name)
     print(db_functions.login(subject_creds.uname, new_pass))
 
 def populate_professors():
@@ -125,6 +128,7 @@ def populate_professors():
     element["uname"] = username
     element["email"] = email
     element["pass"] = add_password()
+    element["course"]
     db_functions.create_user(element)
     fname = "NH"
     lname = "Keene"
@@ -139,9 +143,9 @@ def populate_professors():
 
 if __name__ == "__main__":
     # populate_students()
-    Students = db_functions.table_loader("Student")
+    Students = db_functions.table_loader("student")
     # populate_professors()
-    Professors = db_functions.table_loader("Professor")
+    Professors = db_functions.table_loader("professor")
     for prof in Professors:
         print(prof)
         login = db_functions.get_login(prof.id, "professor")
