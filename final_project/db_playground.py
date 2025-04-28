@@ -106,19 +106,17 @@ def populate_students(NUM_STUDENTS=21):
         response = db_functions.create_user(element)
         print(response)
 
-def login_test(student: StudentData):
-    print(student)
-    subject_creds = db_functions.get_login(student.id, "student")
+def login_test(user: StudentData| ProfessorData | DeanData, dtype: str):
+    subject_creds = db_functions.get_login(user.id, dtype)
     print(subject_creds)
     new_pass = subject_creds.password + '@'
     successful_login = db_functions.login(subject_creds.uname, subject_creds.password)
     print(successful_login[1])
-    user = db_functions.get_user(successful_login[0].token_key)
-    print(user.StudentData.name)
     print(db_functions.login(subject_creds.uname, new_pass))
 
 def populate_professors():
-    element = {"obj_class": "professor"}
+    major_id = db_functions.create_major("Electrical Engineering")
+    element = {"obj_class": "professor", "major_id": major_id}
     ##Starting with just two professors
     fname = "Deli"
     lname = "Katz"
@@ -128,8 +126,8 @@ def populate_professors():
     element["uname"] = username
     element["email"] = email
     element["pass"] = add_password()
-    element["course"]
-    db_functions.create_user(element)
+    ret = db_functions.create_user(element)
+    print(ret[0])
     fname = "NH"
     lname = "Keene"
     username = fname + "_" + lname
@@ -139,16 +137,40 @@ def populate_professors():
     element["uname"] = username
     element["email"] = email
     element["pass"] = add_password()
-    db_functions.create_user(element)
+    ret = db_functions.create_user(element)
+    print(ret[0])
+
+def create_course(prof: ProfessorData):
+    login_creds = db_functions.get_login(prof.id, "professor")
+    token, status = db_functions.login(login_creds.uname, login_creds.password)
+    key = token.token_key
+    semester_id = db_functions.create_semester("Spring 2025")
+    if status < 0:
+        print("something went wrong creating semester")
+    course_info = {"name": "Daterbasers",
+                   "course code": "ECE-464",
+                   "section": "A"}
+    gen_course, status = db_functions.create_gen_course(key, course_info)
+    if status < 0:
+        print("Something went wrong creating the general course")
+    course_info["semester id"] = semester_id
+    course_info["breakdown"] = ""
+    return db_functions.create_course_instance(course_info, key)
+
+
 
 if __name__ == "__main__":
     # populate_students()
-    Students = db_functions.table_loader("student")
+    # Students = db_functions.table_loader("student")
+    # for student in Students:
+    #     print(student)  
     # populate_professors()
     Professors = db_functions.table_loader("professor")
     for prof in Professors:
         print(prof)
-        login = db_functions.get_login(prof.id, "professor")
-        print(login.id)
-    login_test(Students[-1])
+    #     login = db_functions.get_login(prof.id, "professor")
+    #     print(login.uid)
+    #     print(f"{login.uname} {login.password}")
+    login_test(Professors[-1], "professor")
+    create_course(Professors[-1])
     print("Done printing students")

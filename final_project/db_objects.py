@@ -49,7 +49,7 @@ class ProfessorData(Base):
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
-
+    courses: Mapped[List["Course"]] = relationship(back_populates="prof")
 
 
 class DeanData(Base):
@@ -59,6 +59,11 @@ class DeanData(Base):
     email: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
 
+##Simple human-readable table
+class Major_Labels(Base):
+    __tablename__ = "major"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str]
 
 class CourseArchetype(Base):
     __tablename__ = "course_archetype"
@@ -67,18 +72,18 @@ class CourseArchetype(Base):
     course_code: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
 
-
 class Semesters(Base):
     __tablename__ = "semesters"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str]
+    name: Mapped[str] = mapped_column(unique=True)
 
 
 class Course(Base):
     __tablename__ = "course"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     running: Mapped[bool] = mapped_column(default=True)
-    prof_id: Mapped[int]
+    prof: Mapped["ProfessorData"] = relationship(back_populates="courses")
+    prof_id: Mapped[int] = mapped_column(ForeignKey("professor_data.id"))
     course_id: Mapped[int]
     section: Mapped[str]
     semester_id: Mapped[int]

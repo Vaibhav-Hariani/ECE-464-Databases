@@ -7,13 +7,6 @@ from time import sleep
 from db_functions import *
 from db_objects import *
 
-##Assuming that 
-def student_view():
-    pass
-def professor_view():
-    pass
-def dean_view():
-    pass
 
 # TODO: use azure login for security. 
 # In the meantime, simple session states and passwords will do
@@ -41,7 +34,7 @@ def log_out():
     st.session_state["st_login"] = False
     st.session_state["st_token"] = False
     st.success("Logged out!")
-    sleep(5)j
+    sleep(5)
     st.rerun()
 
 
@@ -55,8 +48,8 @@ def runner():
 
         pg = st.navigation(
             {
-                "Account": [logout_page],
                 "Course Management": [register_page, course_page],
+                "Account": [logout_page],
                 # "Assignment View": [assignment_page],
             }
         )
