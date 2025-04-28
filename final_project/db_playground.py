@@ -144,14 +144,14 @@ def create_course(prof: ProfessorData):
     login_creds = db_functions.get_login(prof.id, "professor")
     token, status = db_functions.login(login_creds.uname, login_creds.password)
     key = token.token_key
-    semester_id = db_functions.create_semester("Spring 2025")
-    if status < 0:
+    semester_id, status = db_functions.create_semester("Spring 2025")
+    if status != 0:
         print("something went wrong creating semester")
     course_info = {"name": "Daterbasers",
                    "course code": "ECE-464",
                    "section": "A"}
     gen_course, status = db_functions.create_gen_course(key, course_info)
-    if status < 0:
+    if status != 0:
         print("Something went wrong creating the general course")
     course_info["semester id"] = semester_id
     course_info["breakdown"] = ""
@@ -160,17 +160,17 @@ def create_course(prof: ProfessorData):
 
 
 if __name__ == "__main__":
-    # populate_students()
-    # Students = db_functions.table_loader("student")
-    # for student in Students:
-    #     print(student)  
-    # populate_professors()
+    populate_students()
+    Students = db_functions.table_loader("student")
+    for student in Students:
+        print(student)  
+    populate_professors()
     Professors = db_functions.table_loader("professor")
     for prof in Professors:
         print(prof)
-    #     login = db_functions.get_login(prof.id, "professor")
-    #     print(login.uid)
-    #     print(f"{login.uname} {login.password}")
+        login = db_functions.get_login(prof.id, "professor")
+        print(login.uid)
+        print(f"{login.uname} {login.password}")
     login_test(Professors[-1], "professor")
     create_course(Professors[-1])
     print("Done printing students")

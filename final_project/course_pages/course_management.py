@@ -6,8 +6,17 @@ from db_objects import *
 
 
 def professor_courseman(user: ProfessorData):
-    courses = get_prof_courses(user)
-    st.write(courses)
+    courses, archetypes, semesters, status = get_prof_courses(user)
+    running_i = []
+    labels = []
+    for i in range(len(courses)):
+        if courses[i].running:
+            running_i.append(i)
+            labels.append(archetypes[i].course_name)
+    tabs = st.tabs(labels)
+    for i in range(len(tabs)):
+        with tabs[i]:
+            st.write(labels[i])
     pass
 
 
@@ -34,7 +43,4 @@ if __name__ == "__main__":
         st.stop()
     token = st.session_state["st_token"]
     user, utype = get_user(token.token_key)
-    st.write(utype)
     runner_table[utype](user)
-
-1

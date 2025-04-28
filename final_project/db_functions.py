@@ -104,13 +104,28 @@ def create_major(major_name):
         session.commit()
         return major_obj.id
 
+
+##1 means the object already exists, so creation failed
+## As protection, that existing object is returned
 def create_semester(semester_name):
-    with Session() as session:
-        sem = Semesters(name=semester_name)
-        session.add(sem)
-        session.commit()
-        return sem.id
-   
+    try:
+        with Session() as session:
+            sem = Semesters(name=semester_name)
+            session.add(sem)
+            session.commit()
+            return (sem.id, 0)
+    except IntegrityError:
+        with Session() as session:
+            stmt= select(Semesters).where(semester_name == semester_name)
+            ret = session.execute(stmt).scalar()
+            return (ret.id, 1)
+            
+def get_semester(semester_id) -> tuple[List[Semesters], int]:
+        with Session() as session:
+            stmt = select(Semesters).where(Semesters.id == semester_id) 
+            return (session.execute(stmt).fetchall(),0)
+
+
 ##Course Creation
 def create_gen_course(key: str, courseinfo: dict):
     token = get_token(key)
@@ -118,24 +133,24 @@ def create_gen_course(key: str, courseinfo: dict):
         return ("Token has Expired", -1)
     course_name = courseinfo["name"]
     course_code = courseinfo["course code"]
-    try:
-        with Session.begin() as session:
-            login = session.merge(token).login
-            if login.type != "dean" and login.type != "professor":
-                return ("You Should not have permission to access this resource!", -2)
-            user, utype = get_user(key)
-            major_id = user.major_id
-            with Session.begin() as session:
+    with Session() as session:
+        try:
+                login = session.merge(token).login
+                if login.type != "dean" and login.type != "professor":
+                    return ("You Should not have permission to access this resource!", -2)
+                user, utype = get_user(key)
+                major_id = user.major_id
                 course = CourseArchetype(
                     course_code=course_code, course_name=course_name, major_id=major_id
                 )
                 session.add(course)
                 session.commit()
-                return (course.id, 0)
-            
-    except IntegrityError:
-        return ("Course Already Exists!", -1)
-
+                return (course.id, 0)                
+        except IntegrityError:
+            session.rollback()
+            stmt = select(CourseArchetype).where(course_code == course_code)
+            ret = session.execute(stmt).scalar()
+            return (ret, 1)
 
 def create_course_instance(courseinfo: dict, token_str: str):
     token = get_token(token_str)
@@ -155,9 +170,9 @@ def create_course_instance(courseinfo: dict, token_str: str):
             if arch is None:
                 return ("Overarching Course No Longer exists", -2)
             arch = arch[0]
-            course = Course(
+            course = Courses(
                 prof_id=login.uid,
-                course_id=arch.id,
+                archetype=arch,
                 section=courseinfo["section"],
                 semester_id=courseinfo["semester id"],
                 course_breakdown=courseinfo["breakdown"],
@@ -168,9 +183,16 @@ def create_course_instance(courseinfo: dict, token_str: str):
     return (course_code, 0)
 
 
-def get_prof_courses(user: ProfessorData):
+def get_prof_courses(user: ProfessorData) -> tuple[List[Courses],  List[CourseArchetype], List[Semesters], int]:
     with Session() as session:
-        return session.merge(user).courses
+        user = session.merge(user)
+        courses = user.courses
+        archetypes = []
+        semesters = []
+        for course in courses:
+            semesters.append(get_semester(course.semester_id))
+            archetypes.append(course.archetype)
+        return (courses, archetypes, semesters, 0)
 
 ##Token Behavior
 def create_session_token(login_obj: Login, session):
