@@ -1,7 +1,7 @@
 import os
 import datetime
 from typing import List, Optional
-from sqlalchemy import DateTime, String, create_engine, ForeignKey
+from sqlalchemy import Column, DateTime, String, Table, create_engine, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import (
     Mapped,
@@ -15,17 +15,24 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = "sqlite:///" + os.path.join(basedir, "database.db")
 
 engine = create_engine(DB_PATH, echo=False)
-Session = sessionmaker(engine,expire_on_commit=False)
+Session = sessionmaker(engine, expire_on_commit=False)
 ##Postgre: postgresql://username:password@host:port/database_name
 
 
 class Base(DeclarativeBase):
     pass
+##Association table for bi-directional many to many
+##Used for student to course relationship
+student_course_assoc = Table(
+    "student_course_assoc_table",
+    Base.metadata,
+    Column("left_id", ForeignKey("courses.id"), primary_key=True),
+    Column("right_id", ForeignKey("student_data.id"), primary_key=True),
+)
+
 
 
 ##Fundamental Login & User models
-
-
 class Login(Base):
     __tablename__ = "login"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -41,6 +48,8 @@ class StudentData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
+    reg_courses: Mapped[List["Courses"]] = relationship(secondary=student_course_assoc, back_populates="students") 
+    submissions: Mapped[List["Assignment"]] = relationship(back_populates="student")
 
 
 class ProfessorData(Base):
@@ -59,24 +68,28 @@ class DeanData(Base):
     email: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
 
+
 ##Simple human-readable table
 class Major_Labels(Base):
     __tablename__ = "major"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
 
+
 class CourseArchetype(Base):
     __tablename__ = "course_archetypes"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     course_name: Mapped[str] = mapped_column()
     course_code: Mapped[str] = mapped_column(unique=True)
-    courses: Mapped[List["Courses"]] = relationship(back_populates="archetype")
+    courses: Mapped[set["Courses"]] = relationship(back_populates="archetype")
     major_id: Mapped[int]
+
 
 class Semesters(Base):
     __tablename__ = "semesters"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(unique=True)
+
 
 class Courses(Base):
     __tablename__ = "courses"
@@ -88,56 +101,76 @@ class Courses(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("course_archetypes.id"))
     section: Mapped[str]
     semester_id: Mapped[int]
-    course_breakdown: Mapped[str]
+    course_breakdown: Mapped[List["AssignSpec"]] = relationship(back_populates="course")
+    curve: Mapped[Optional[str]]
+    students: Mapped[set["StudentData"]] = relationship(secondary=student_course_assoc, back_populates="reg_courses") 
 
-##General class with 
-class Assign_Spec(Base):
 
+##General classes for all assignments
+class AssignSpec(Base):
+    __tablename__ = "assign_type"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    course: Mapped["Courses"] = relationship(back_populates="course_breakdown")
+    label: Mapped[str]
+    weight: Mapped[float]
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"))
+    assignments: Mapped[List["Assignment"]] = relationship(back_populates="type")
 
 
 class Assignment(Base):
     __tablename__ = "assignment"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    course_id: Mapped[int]
-    assignment_weight: Mapped[int]
+    type: Mapped["AssignSpec"] = relationship(back_populates="assignments")
+    spec_id: Mapped[int] = mapped_column(ForeignKey("assign_type.id"))
+    submissions: Mapped[List["AssignmentGrade"]] = relationship(
+        back_populates="assignment"
+    )
+    weight: Mapped[int]
     due_date: Mapped[datetime.datetime]
     name: Mapped[str]
-    curve: Mapped[str]
+    curve: Mapped[Optional[str]]
 
 
-class StudentCourseLayer(Base):
-    __tablename__ = "student_course_layer"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    student_id: Mapped[int]
-    course_id: Mapped[int]
+# class StudentCourseLayer(Base):
+#     __tablename__ = "student_course_layer"
+#     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+#     student_id: Mapped[int]
+#     course_id: Mapped[int]
 
 
 class AssignmentGrade(Base):
     __tablename__ = "assignment_grade"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    submitted: Mapped[bool]
-    time_submitted: Mapped[datetime.datetime]
-    assignment_id: Mapped[int]
-    student_course_layer_id: Mapped[int]
+    assignment: Mapped["Assignment"] = relationship(back_populates="submissions")
+    assign_id: Mapped[int] = mapped_column(ForeignKey("assignment.id"))
+    grade: Mapped[float] = mapped_column(default=0.0)
+    submitted: Mapped[bool] = mapped_column(default=False)
+    time_submitted: Mapped[Optional[datetime.datetime]]
+    student: Mapped["StudentData"] = relationship(back_populates="submissions")
+    student_id = mapped_column(ForeignKey("student_data.id"))
 
+
+def get_time():
+    return datetime.datetime.now()
 
 def set_session_time():
     return datetime.datetime.now() + datetime.timedelta(hours=2)
- 
+
 
 class SessionToken(Base):
     __tablename__ = "session_token"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     token_key: Mapped[str] = mapped_column(String(64))
     active: Mapped[bool] = mapped_column(default=True)
-    login: Mapped["Login"] = relationship("Login",back_populates="token")
+    login: Mapped["Login"] = relationship("Login", back_populates="token")
     uid: Mapped[int] = mapped_column(ForeignKey("login.id"))
-    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=set_session_time())
+    expires_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=set_session_time()
+    )
 
     def is_expired(self) -> bool:
         """Checks if the token has expired."""
         return self.active and datetime.datetime.now() > self.expires_at
-
 
 
 Base.metadata.create_all(engine)
