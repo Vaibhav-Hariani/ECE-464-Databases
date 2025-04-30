@@ -9,6 +9,6 @@ services:
     ports:
       - "5432:5432" # Maps host port 8080 to container port 80
     volumes:
-    - ./:/var/lib/postgresql/data
+    - /home/vaibh/Documents/ECE-464-Databases/final_project/database/pdb:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: password
