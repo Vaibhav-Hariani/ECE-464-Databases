@@ -163,17 +163,17 @@ def create_course(prof: ProfessorData):
 
 
 if __name__ == "__main__":
-    # populate_students()
-    # Students = db_functions.table_loader("student")
-    # for student in Students:
-    #     print(student)
-    # populate_professors()
+    populate_students()
+    Students = db_functions.table_loader("student")
+    for student in Students:
+        print(student)
+    populate_professors()
     Professors = db_functions.table_loader("professor")
-    # for prof in Professors:
-    #     print(prof)
-    #     login = db_functions.get_login(prof.id, "professor")
-    #     print(login.uid)
-    #     print(f"{login.uname} {login.password}")
-    # login_test(Professors[-1], "professor")
+    for prof in Professors:
+        print(prof)
+        login = db_functions.get_login(prof.id, "professor")
+        print(login.uid)
+        print(f"{login.uname} {login.password}")
+    login_test(Professors[-1], "professor")
     create_course(Professors[0])
     print("Done printing students")

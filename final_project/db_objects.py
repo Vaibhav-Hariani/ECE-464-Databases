@@ -2,7 +2,6 @@ import os
 import datetime
 from typing import List, Optional
 from sqlalchemy import Column, DateTime, String, Table, create_engine, ForeignKey
-from sqlalchemy.sql import func
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -10,13 +9,25 @@ from sqlalchemy.orm import (
     sessionmaker,
     relationship,
 )
+from sqlalchemy.engine import URL
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = "sqlite:///" + os.path.join(basedir, "database.db")
+# basedir = os.path.abspath(os.path.dirname(__file__))
+# For Sqllite: Unsupported for some funcs or blobs.
+# DB_PATH = "sqlite:///" + os.path.join(basedir, "database.db")
+## For SqlAlchemypi
 
-engine = create_engine(DB_PATH, echo=False)
+url = URL.create(
+    drivername="postgresql",
+    username="postgres",
+    password="password",
+    host="localhost",
+    port="5432",
+    database="postgres"
+)
+
+engine = create_engine(url, echo=False)
 Session = sessionmaker(engine, expire_on_commit=False)
-##Postgre: postgresql://username:password@host:port/database_name
+#Postgre: postgresql://username:password@host:port/database_name
 
 
 class Base(DeclarativeBase):

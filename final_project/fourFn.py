@@ -171,7 +171,8 @@ def evaluate_stack(s, raw_score, data=None):
         args = reversed([evaluate_stack(s, raw_score, data) for _ in range(num_args)])
         return fn[op](*args)
     elif op in stats:
-        ##and stat_extend.is_valid(data): (Santizer)
+        if not stat_extend.is_valid(data):
+            raise Exception("Statistics are not supported for this dtype") 
         return stats[op](data)
     elif op[0].isalpha():
         raise Exception("invalid identifier '%s'" % op)
@@ -182,6 +183,19 @@ def evaluate_stack(s, raw_score, data=None):
         except ValueError:
             return float(op)
 
+def parse(s, raw_score=None, data=None):
+    exprStack[:] = []
+    try:
+        results = BNF().parseString(s, parseAll=True)
+        val = evaluate_stack(exprStack[:], raw_score, data)
+        return (val, 0)
+
+    except ParseException as pe:
+        # print(s, "failed parse:", str(pe))
+        return ("Parse Failed", -1)
+    except Exception as e:
+        # print(s, "failed eval:", str(e), exprStack)
+        return ("Parse Failed", -1)
 
 if __name__ == "__main__":
 

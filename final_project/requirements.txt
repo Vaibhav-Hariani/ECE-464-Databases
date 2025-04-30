@@ -1,8 +1,10 @@
 ##ORM
-SqlAlchemy
+sqlalchemy
+psycopg2-binary
 ##UI
 streamlit
 st_pages
-extra-streamlit-components
+##Parser
+pyparsing
 ##Optional: Only necessary for data generation
 wonderwords

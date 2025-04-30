@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, delete
 import secrets
 from db_objects import *
-from curve_parser import parse_curve
+from fourFn import parse
 
 ##Helpers for testing
 Tables = {"student": (StudentData), "professor": (ProfessorData), "dean": {DeanData}}
@@ -246,7 +246,7 @@ def get_student_grade(uid, course: Courses):
 def apply_curve(raw, curve):
     if curve is None:
         return raw
-    return parse_curve(raw, curve)
+    return parse(raw, curve)
 
 
 def create_course_instance(courseinfo: dict, token_str: str):
