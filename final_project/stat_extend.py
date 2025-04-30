@@ -33,6 +33,7 @@ def min(assign: Assignment):
         return 0
     return data
 
+
 def max(assign: Assignment):
     stmt = select(func.max(AssignmentGrade.grade)).where(
         AssignmentGrade.assign_id == assign.id

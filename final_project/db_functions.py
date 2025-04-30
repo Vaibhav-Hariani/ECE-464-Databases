@@ -89,6 +89,7 @@ def create_professor(data: dict):
         except IntegrityError:
             return -1
 
+
 def get_user(token_key: str):
     with Session() as session:
         token = get_token(token_key)
@@ -183,24 +184,27 @@ def new_assignment(assign_type: AssignSpec, args: dict):
         )
         session.add(assign)
 
+
 ##Creates empty AssignmentGrades for each student
 def create_grades(assign: Assignment):
     with Session.begin() as session:
         assign = session.merge(assign)
         students = assign.type.course.students
         for student in students:
-            submittable = AssignmentGrade(assignment=assign,student=student)
+            submittable = AssignmentGrade(assignment=assign, student=student)
             session.add(submittable)
     return ("Success!", 0)
+
 
 ##Depending on future work, may need to add ability to upload
 def submit(uid: int, assignment: Assignment):
     with Session.begin() as session:
-        stmt = select(AssignmentGrade).where(student_id = uid, assign_id=assignment.id)
+        stmt = select(AssignmentGrade).where(student_id=uid, assign_id=assignment.id)
         gradable = session.exec(stmt).scalar()
         gradable.submitted = True
         gradable.time_submitted = get_time()
     return ("Success!", 0)
+
 
 ##Returns all assignment specs
 def get_assign_specs(course: Courses):
@@ -208,10 +212,12 @@ def get_assign_specs(course: Courses):
         course = session.merge(course)
         return course.course_breakdown
 
+
 def get_assignments(assigns: AssignSpec):
     with Session() as session:
         assigns = session.merge(assigns)
         return assigns.assignments
+
 
 def get_student_grade(uid, course: Courses):
     with Session() as session:
@@ -224,7 +230,9 @@ def get_student_grade(uid, course: Courses):
             for assign in assignments:
                 curve = assign.curve
                 lweight = assign.weight
-                stmt = select(AssignmentGrade.grade).where(student_id=uid,assign_id=assign.id)
+                stmt = select(AssignmentGrade.grade).where(
+                    student_id=uid, assign_id=assign.id
+                )
                 ##Assumption is that each student only submits one grade per assignment
                 assign_grade = session.execute(stmt).scalar()
                 lgrade += apply_curve(assign_grade, curve) * lweight
@@ -232,12 +240,14 @@ def get_student_grade(uid, course: Courses):
         grade = apply_curve(grade, course.curve)
         return (grade, 0)
 
+
 ##Grades are stored in 0-100 format.
-##This needs to take those values, and curve them according to 
+##This needs to take those values, and curve them according to
 def apply_curve(raw, curve):
     if curve is None:
         return raw
-    return parse_curve(raw,curve)    
+    return parse_curve(raw, curve)
+
 
 def create_course_instance(courseinfo: dict, token_str: str):
     token = get_token(token_str)
@@ -317,10 +327,10 @@ def login(uname, password) -> tuple[SessionToken, int]:
 
 ##Course management
 def get_prof_courses(
-    token: str
+    token: str,
 ) -> tuple[List[Courses], List[CourseArchetype], List[Semesters], int]:
     user = get_user(token)
-    with Session() as session:        
+    with Session() as session:
         user = session.merge(user)
         courses = user.courses
         archetypes = []
@@ -329,6 +339,7 @@ def get_prof_courses(
             semesters.append(get_semester(course.semester_id))
             archetypes.append(course.archetype)
         return (courses, archetypes, semesters, 0)
+
 
 ##TODO: Finish this function
 def reg_student(token, course_data: dict):

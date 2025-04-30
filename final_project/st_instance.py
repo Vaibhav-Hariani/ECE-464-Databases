@@ -8,27 +8,28 @@ from db_functions import *
 from db_objects import *
 
 
-# TODO: use azure login for security. 
+# TODO: use azure login for security.
 # In the meantime, simple session states and passwords will do
 def log_in():
     username = st.text_input("Username", key="username")
     password = st.text_input("Password", key="password", type="password")
     if st.button("Login"):
-        if not db_login(username,password):
+        if not db_login(username, password):
             st.error("Username or Password False!")
         else:
             st.rerun()
 
 
-def db_login(username,password):
+def db_login(username, password):
     print(f"{username}, {password}")
-    login_details = login(username,password)
-    if(login_details[-1] == 0):
+    login_details = login(username, password)
+    if login_details[-1] == 0:
         st.session_state["st_login"] = True
         st.session_state["st_token"] = login_details[0]
         return True
     else:
         return False
+
 
 def log_out():
     st.session_state["st_login"] = False
@@ -42,8 +43,16 @@ def runner():
     login_page = st.Page(log_in, title="Log in", icon=":material/login:")
     logout_page = st.Page(log_out, title="Log out", icon=":material/logout:")
 
-    register_page = st.Page("course_pages/add_drop.py", title="Add or Drop a Class", icon=":material/grading:")
-    course_page = st.Page("course_pages/course_management.py", title="Existing Classes", icon=":material/grading:")
+    register_page = st.Page(
+        "course_pages/add_drop.py",
+        title="Add or Drop a Class",
+        icon=":material/grading:",
+    )
+    course_page = st.Page(
+        "course_pages/course_management.py",
+        title="Existing Classes",
+        icon=":material/grading:",
+    )
     if st.session_state["st_login"]:
 
         pg = st.navigation(

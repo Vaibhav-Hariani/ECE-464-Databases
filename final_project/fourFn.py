@@ -30,6 +30,7 @@ from pyparsing import (
 import math
 import operator
 import stat_extend
+
 exprStack = []
 
 
@@ -83,6 +84,7 @@ def BNF():
 
         expr = Forward()
         expr_list = delimitedList(Group(expr))
+
         # add parse action that replaces the function identifier with a (name, number of args) tuple
         def insert_fn_argcount_tuple(t):
             fn = t.pop(0)
@@ -138,12 +140,13 @@ fn = {
 }
 ##My extension for statistical function support
 stats = {
-    "mean":stat_extend.mean,
+    "mean": stat_extend.mean,
     "min": stat_extend.min,
     "max": stat_extend.max,
     "range": stat_extend.range,
-    "stddev": stat_extend.stddev,    
+    "stddev": stat_extend.stddev,
 }
+
 
 ##Data is the layer at which this is being passed in
 def evaluate_stack(s, raw_score, data=None):
@@ -151,11 +154,11 @@ def evaluate_stack(s, raw_score, data=None):
     if isinstance(op, tuple):
         op, num_args = op
     if op == "unary -":
-        return -evaluate_stack(s,raw_score,data)
+        return -evaluate_stack(s, raw_score, data)
     if op in "+-*/^":
         # note: operands are pushed onto the stack in reverse order
-        op2 = evaluate_stack(s,raw_score,data)
-        op1 = evaluate_stack(s,raw_score,data)
+        op2 = evaluate_stack(s, raw_score, data)
+        op1 = evaluate_stack(s, raw_score, data)
         return opn[op](op1, op2)
     elif op == "PI":
         return math.pi  # 3.1415926535
@@ -165,10 +168,10 @@ def evaluate_stack(s, raw_score, data=None):
         return raw_score
     elif op in fn:
         # note: args are pushed onto the stack in reverse order
-        args = reversed([evaluate_stack(s,raw_score,data) for _ in range(num_args)])
+        args = reversed([evaluate_stack(s, raw_score, data) for _ in range(num_args)])
         return fn[op](*args)
     elif op in stats:
-    ##and stat_extend.is_valid(data): (Santizer)
+        ##and stat_extend.is_valid(data): (Santizer)
         return stats[op](data)
     elif op[0].isalpha():
         raise Exception("invalid identifier '%s'" % op)
@@ -182,11 +185,11 @@ def evaluate_stack(s, raw_score, data=None):
 
 if __name__ == "__main__":
 
-    def test(s, expected,raw_score=None,data=None):
+    def test(s, expected, raw_score=None, data=None):
         exprStack[:] = []
         try:
             results = BNF().parseString(s, parseAll=True)
-            val = evaluate_stack(exprStack[:],raw_score,data)
+            val = evaluate_stack(exprStack[:], raw_score, data)
         except ParseException as pe:
             print(s, "failed parse:", str(pe))
         except Exception as e:
@@ -197,8 +200,8 @@ if __name__ == "__main__":
             else:
                 print(s + "!!!", val, "!=", expected, results, "=>", exprStack)
 
-    test("9 * x", 90 ,10, None)
-    test("sqrt(10 * x)", 10 ,10, None)
+    test("9 * x", 90, 10, None)
+    test("sqrt(10 * x)", 10, 10, None)
 
     test("-9", -9)
     test("--9", 9)
@@ -213,8 +216,8 @@ if __name__ == "__main__":
     test("3.1415926535*3.1415926535 / 10", 3.1415926535 * 3.1415926535 / 10)
     test("PI * PI / 10", math.pi * math.pi / 10)
     test("PI*PI/10", math.pi * math.pi / 10)
-    test("PI^2", math.pi ** 2)
-    test("round(PI^2)", round(math.pi ** 2))
+    test("PI^2", math.pi**2)
+    test("round(PI^2)", round(math.pi**2))
     test("6.02E23 * 8.048", 6.02e23 * 8.048)
     test("e / 3", math.e / 3)
     test("sin(PI/2)", math.sin(math.pi / 2))
@@ -223,20 +226,20 @@ if __name__ == "__main__":
     test("trunc(-E)", int(-math.e))
     test("round(E)", round(math.e))
     test("round(-E)", round(-math.e))
-    test("E^PI", math.e ** math.pi)
+    test("E^PI", math.e**math.pi)
     test("exp(0)", 1)
     test("exp(1)", math.e)
-    test("2^3^2", 2 ** 3 ** 2)
-    test("(2^3)^2", (2 ** 3) ** 2)
-    test("2^3+2", 2 ** 3 + 2)
-    test("2^3+5", 2 ** 3 + 5)
-    test("2^9", 2 ** 9)
+    test("2^3^2", 2**3**2)
+    test("(2^3)^2", (2**3) ** 2)
+    test("2^3+2", 2**3 + 2)
+    test("2^3+5", 2**3 + 5)
+    test("2^9", 2**9)
     test("sgn(-2)", -1)
     test("sgn(0)", 0)
     test("sgn(0.1)", 1)
     test("foo(0.1)", None)
     test("round(E, 3)", round(math.e, 3))
-    test("round(PI^2, 3)", round(math.pi ** 2, 3))
+    test("round(PI^2, 3)", round(math.pi**2, 3))
     test("sgn(cos(PI/4))", 1)
     test("sgn(cos(PI/2))", 0)
     test("sgn(cos(PI*3/4))", -1)

@@ -3,8 +3,6 @@ from db_functions import *
 from db_objects import *
 
 
-
-
 def professor_courseman(user: ProfessorData):
     courses, archetypes, semesters, status = get_prof_courses(user)
     running_i = []
@@ -28,7 +26,6 @@ def student_courseman(user: StudentData):
 def dean_courseman(user: DeanData):
     st.write("Coming Soon!")
     pass
-
 
 
 runner_table = {

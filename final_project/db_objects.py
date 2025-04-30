@@ -21,6 +21,8 @@ Session = sessionmaker(engine, expire_on_commit=False)
 
 class Base(DeclarativeBase):
     pass
+
+
 ##Association table for bi-directional many to many
 ##Used for student to course relationship
 student_course_assoc = Table(
@@ -29,7 +31,6 @@ student_course_assoc = Table(
     Column("left_id", ForeignKey("courses.id"), primary_key=True),
     Column("right_id", ForeignKey("student_data.id"), primary_key=True),
 )
-
 
 
 ##Fundamental Login & User models
@@ -48,7 +49,9 @@ class StudentData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
-    reg_courses: Mapped[List["Courses"]] = relationship(secondary=student_course_assoc, back_populates="students") 
+    reg_courses: Mapped[List["Courses"]] = relationship(
+        secondary=student_course_assoc, back_populates="students"
+    )
     submissions: Mapped[List["Assignment"]] = relationship(back_populates="student")
 
 
@@ -103,7 +106,9 @@ class Courses(Base):
     semester_id: Mapped[int]
     course_breakdown: Mapped[List["AssignSpec"]] = relationship(back_populates="course")
     curve: Mapped[Optional[str]]
-    students: Mapped[set["StudentData"]] = relationship(secondary=student_course_assoc, back_populates="reg_courses") 
+    students: Mapped[set["StudentData"]] = relationship(
+        secondary=student_course_assoc, back_populates="reg_courses"
+    )
 
 
 ##General classes for all assignments
@@ -152,6 +157,7 @@ class AssignmentGrade(Base):
 
 def get_time():
     return datetime.datetime.now()
+
 
 def set_session_time():
     return datetime.datetime.now() + datetime.timedelta(hours=2)
