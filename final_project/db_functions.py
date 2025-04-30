@@ -191,7 +191,7 @@ def create_grades(assign: Assignment):
         for student in students:
             submittable = AssignmentGrade(assignment=assign,student=student)
             session.add(submittable)
-    return ("Success!", 0)    
+    return ("Success!", 0)
 
 ##Depending on future work, may need to add ability to upload
 def submit(uid: int, assignment: Assignment):
@@ -200,7 +200,7 @@ def submit(uid: int, assignment: Assignment):
         gradable = session.exec(stmt).scalar()
         gradable.submitted = True
         gradable.time_submitted = get_time()
-    return ("Success!", 0)    
+    return ("Success!", 0)
 
 ##Returns all assignment specs
 def get_assign_specs(course: Courses):
@@ -237,7 +237,7 @@ def get_student_grade(uid, course: Courses):
 def apply_curve(raw, curve):
     if curve is None:
         return raw
-    return parse_curve(raw)    
+    return parse_curve(raw,curve)    
 
 def create_course_instance(courseinfo: dict, token_str: str):
     token = get_token(token_str)
