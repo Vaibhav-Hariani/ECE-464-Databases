@@ -2,4 +2,4 @@
 */pgdata
 __pycache__
 *.db
-database/home/*
+final_project/database/home
