@@ -185,17 +185,9 @@ def evaluate_stack(s, raw_score, data=None):
 
 def parse(s, raw_score=None, data=None):
     exprStack[:] = []
-    try:
-        results = BNF().parseString(s, parseAll=True)
-        val = evaluate_stack(exprStack[:], raw_score, data)
-        return (val, 0)
-
-    except ParseException as pe:
-        # print(s, "failed parse:", str(pe))
-        return ("Parse Failed", -1)
-    except Exception as e:
-        # print(s, "failed eval:", str(e), exprStack)
-        return ("Parse Failed", -1)
+    results = BNF().parseString(s, parseAll=True)
+    val = evaluate_stack(exprStack[:], raw_score, data)
+    return val
 
 if __name__ == "__main__":
 
@@ -214,7 +206,7 @@ if __name__ == "__main__":
             else:
                 print(s + "!!!", val, "!=", expected, results, "=>", exprStack)
 
-    test("9 * x", 90, 10, None)
+    test("9 * x", 90, 10.0, None)
     test("sqrt(10 * x)", 10, 10, None)
 
     test("-9", -9)

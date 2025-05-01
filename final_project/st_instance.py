@@ -26,6 +26,7 @@ def db_login(username, password):
     if login_details[-1] == 0:
         st.session_state["st_login"] = True
         st.session_state["st_token"] = login_details[0]
+        st.session_state["st_utype"] = login_details[1]
         return True
     else:
         return False
@@ -34,6 +35,7 @@ def db_login(username, password):
 def log_out():
     st.session_state["st_login"] = False
     st.session_state["st_token"] = False
+    st.session_state["st_utype"] = None
     st.success("Logged out!")
     sleep(5)
     st.rerun()
@@ -74,6 +76,7 @@ if __name__ == "__main__":
         if "st_login" not in st.session_state:
             st.session_state["st_login"] = False
             st.session_state["st_token"] = 0
+            st.session_state["st_utype"] = None
         runner()
     else:
         sys.argv = [

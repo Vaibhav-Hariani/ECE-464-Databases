@@ -3,20 +3,24 @@ from db_functions import *
 from db_objects import *
 
 
-def professor_courseman(user: ProfessorData):
-    courses, archetypes, semesters, status = get_prof_courses(user)
+def professor_courseman(key: SessionToken):
+    courses, archetypes, semesters, status = get_prof_courses(key)
     running_i = []
     labels = []
+    semester = st.selectbox("Select a semester to grade", [semester[0] for semester in semesters])    
     for i in range(len(courses)):
-        if courses[i].running:
+        if courses[i].running and courses[i].semester_id == semester.id:
             running_i.append(i)
             labels.append(archetypes[i].course_name)
     tabs = st.tabs(labels)
+
     for i in range(len(tabs)):
         with tabs[i]:
-            st.write(labels[i])
-    pass
-
+            course = courses[running_i[i]]
+            grades = get_grades(course)
+            print()
+            st.line_chart(grades[1], x_label="Students (Sorted)", y_label="Grades (Raw)")
+            st.line_chart(grades[0], x_label="Students (Sorted)", y_label="Grades (Curved)")
 
 def student_courseman(user: StudentData):
     st.write("Coming Soon!")
@@ -39,5 +43,6 @@ if __name__ == "__main__":
         st.error("You shouldn't have access to this page!")
         st.stop()
     token = st.session_state["st_token"]
-    user, utype = get_user(token.token_key)
-    runner_table[utype](user)
+    utype = st.session_state["st_utype"]
+    # user, utype = get_user(token.token_key)
+    runner_table[utype](token.token_key)

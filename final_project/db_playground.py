@@ -153,7 +153,7 @@ def create_course(prof: ProfessorData):
     semester_id, status = db_functions.create_semester("Spring 2025")
     if status != 0:
         print("something went wrong creating semester")
-    course_info = {"name": "Daterbasers", "course code": "ECE-464", "section": "A"}
+    course_info = {"name": "Daterbasers", "course_code": "ECE-464", "section": "A"}
     gen_course, status = db_functions.create_gen_course(key, course_info)
     if status != 0:
         print("Something went wrong creating the general course")
@@ -163,17 +163,42 @@ def create_course(prof: ProfessorData):
 
 
 if __name__ == "__main__":
-    populate_students()
-    Students = db_functions.table_loader("student")
+    # populate_students()
+    Students = db_functions.table_loader(StudentData)
     for student in Students:
-        print(student)
-    populate_professors()
-    Professors = db_functions.table_loader("professor")
+        print(student.name)
+        print("Done printing students")
+
+    # populate_professors()
+    Professors = db_functions.table_loader(ProfessorData)
     for prof in Professors:
-        print(prof)
+        print(prof.name)
         login = db_functions.get_login(prof.id, "professor")
         print(login.uid)
         print(f"{login.uname} {login.password}")
     login_test(Professors[-1], "professor")
-    create_course(Professors[0])
-    print("Done printing students")
+    course, status = create_course(Professors[0])
+    breakdown = [("Exams", 0.4), ("Homework", 0.4), ("Participation", 0.1)]
+    breakdown = db_functions.create_breakdown(course.id, breakdown)
+    assign_args = {"weight": 0.5, "name": "midterm", "due_date": db_functions.get_time()}
+    assignment, status = db_functions.new_assignment(course.id, "Exams", assign_args)
+    tokens = [db_functions.get_token_from_udata(student.id, "student") for student in Students]
+    [db_functions.reg_student(token, course_id=course.id) for token in tokens]
+    db_functions.create_grades(assignment)
+    grades = db_functions.table_loader(AssignmentGrade)
+    [db_functions.submit(token, assignment) for token in tokens]
+
+    i = 0.0
+    prof_token = db_functions.get_token_from_udata(Professors[0].id, "professor")
+    for student_grade in grades:
+        grade, status = db_functions.grade(prof_token, student_grade, i)
+        i+=5
+    for token in tokens:
+        print(db_functions.get_student_grade(token, course))    
+    
+    curve = "x * 5 / stddev"
+    db_functions.assign_curve(assignment,curve)
+    curve = "x / 4"
+    db_functions.assign_curve(course, curve)
+    for token in tokens:
+        print(db_functions.get_student_grade(token, course))    

@@ -55,8 +55,13 @@ def range(assign: Assignment):
         return 0
     return data
 
-    return 0
-
 
 def stddev(assign: Assignment):
-    return 0
+    stmt = select(func.stddev(AssignmentGrade.grade)).where(
+        AssignmentGrade.assign_id == assign.id
+    )
+    with Session() as session:
+        data = session.execute(stmt).scalar_one_or_none()
+    if data is None:
+        return 0
+    return data

@@ -3,30 +3,32 @@ from sqlalchemy import select, delete
 import secrets
 from db_objects import *
 from fourFn import parse
+from typing import TypeVar
+
+##For analyzing return types:
+#  1 - Repeat Data: Returned original element instead
+# 0 - Success
+# -1 - Failure,
+# -2 - Permissions Failure
 
 ##Helpers for testing
 Tables = {"student": (StudentData), "professor": (ProfessorData), "dean": {DeanData}}
 
+T = TypeVar("T")  # the variable name must coincide with the string
 
-def table_loader(
-    Table_Label: str,
-) -> list[StudentData] | list[ProfessorData] | list[DeanData]:
+
+def table_loader(obj: type[T]) -> list[T]:
     with Session() as session:
-        stmt = select("*").select_from(Tables[Table_Label])
-        return session.execute(stmt).fetchall()
+        return session.query(obj).all()
 
 
-##This function is just for testing
-def get_login(uid, type) -> Login:
+def get_obj_from_id(id, obj_type: type[T]) -> T:
     with Session() as session:
-        stmt = select(Login).where(Login.uid == uid, Login.type == type)
-        element = session.execute(stmt).fetchall()
-        if len(element) < 1:
-            return "Something went Wrong"
-        return element[0].Login
+        return session.get(obj_type, id)
 
 
-def create_user(args):
+##User creation
+def create_user(args) -> tuple[int | str, int]:
     error = None
     uid = None
     type = args["obj_class"]
@@ -51,7 +53,7 @@ def create_user(args):
     return (uid, 0)
 
 
-def create_student(data: dict):
+def create_student(data: dict) -> StudentData | int:
     id = 0
     with Session() as session:
         try:
@@ -63,7 +65,7 @@ def create_student(data: dict):
             return -1
 
 
-def create_dean(data: dict):
+def create_dean(data: dict) -> DeanData | int:
     with Session() as session:
         try:
             dean = DeanData(
@@ -77,7 +79,7 @@ def create_dean(data: dict):
 
 
 ##safety function
-def create_professor(data: dict):
+def create_professor(data: dict) -> ProfessorData | int:
     with Session() as session:
         try:
             prof = ProfessorData(
@@ -90,20 +92,7 @@ def create_professor(data: dict):
             return -1
 
 
-def get_user(token_key: str):
-    with Session() as session:
-        token = get_token(token_key)
-        login = session.merge(token).login
-        extend_token(token)
-        session.commit()
-        table = Tables[login.type]
-        stmt = select(table).where(login.uid == table.id)
-        user = session.execute(stmt).fetchone()[0]
-        ret = None
-        return (user, login.type)
-
-
-def create_major(major_name):
+def create_major(major_name) -> Major_Labels:
     with Session() as session:
         major_obj = Major_Labels(name=major_name)
         session.add(major_obj)
@@ -113,7 +102,7 @@ def create_major(major_name):
 
 ##1 means the object already exists, so creation failed
 ## As protection, that existing object is returned
-def create_semester(semester_name):
+def create_semester(semester_name) -> tuple[Semesters, int]:
     try:
         with Session() as session:
             sem = Semesters(name=semester_name)
@@ -134,18 +123,15 @@ def get_semester(semester_id) -> tuple[List[Semesters], int]:
 
 
 ##Course Creation
-def create_gen_course(key: str, courseinfo: dict):
-    token = get_token(key)
-    if token.is_expired():
-        return ("Token has Expired", -1)
+def create_gen_course(key: str, courseinfo: dict) -> tuple[Courses, int]:
+    user, utype = get_user(key)
     course_name = courseinfo["name"]
-    course_code = courseinfo["course code"]
+    course_code = courseinfo["course_code"]
     with Session() as session:
         try:
-            login = session.merge(token).login
-            if login.type != "dean" and login.type != "professor":
-                return ("You Should not have permission to access this resource!", -2)
             user, utype = get_user(key)
+            if utype != "dean" and utype != "professor":
+                return ("You Should not have permission to access this resource!", -2)
             major_id = user.major_id
             course = CourseArchetype(
                 course_code=course_code, course_name=course_name, major_id=major_id
@@ -160,52 +146,146 @@ def create_gen_course(key: str, courseinfo: dict):
             return (ret, 1)
 
 
-def create_breakdown(course: Courses, assign_spec: List[tuple[str, float]]):
-    for assign_type, weight in assign_spec:
-        add_gen_assign(assign_type, weight, course)
-    return ("Success!", 0)
-
-
-def add_gen_assign(assign_type: str, weight: float, course: Courses):
-    new_arch = AssignSpec(course=course, weight=weight, label=assign_type)
-    with Session.begin() as session:
-        session.add(new_arch)
-        session.commit()
-    return (new_arch, 0)
-
-
-def new_assignment(assign_type: AssignSpec, args: dict):
-    with Session.begin() as session:
-        assign = Assignment(
-            AssignSpec=assign_type,
-            weight=args["weight"],
-            due_date=args["due_date"],
-            name=args["name"],
+def get_course(courseinfo: dict) -> Courses:
+    get_arch = select(CourseArchetype.id).where(
+        CourseArchetype.course_code == courseinfo["course_code"]
+    )
+    with Session() as session:
+        arch_id = session.execute(get_arch).scalar_one()
+        stmt = select(Courses).where(
+            Courses.semester_id == courseinfo["semester id"],
+            Courses.course_id == arch_id,
+            Courses.section == courseinfo["section"],
         )
-        session.add(assign)
+        return session.execute(stmt).scalar_one()
+
+
+def create_course_instance(courseinfo: dict, key: str) -> tuple[Courses, int]:
+    course_code = courseinfo["course_code"]
+    get_arch = select(CourseArchetype).where(CourseArchetype.course_code == course_code)
+    try:
+        with Session.begin() as session:
+            user, utype = get_user(key)
+            if utype != "professor":
+                return ("You Should not have permission to access this resource!", -2)
+            arch = session.execute(get_arch).fetchone()
+            if arch is None:
+                return ("Overarching Course No Longer exists", -2)
+            arch = arch[0]
+            course = Courses(
+                prof_id=user.id,
+                archetype=arch,
+                section=courseinfo["section"],
+                semester_id=courseinfo["semester id"],
+            )
+            session.add(course)
+            return (course, 0)
+    except IntegrityError:
+        return get_course(courseinfo), 1
+
+
+##Assignment Lifecycle
+def create_breakdown(
+    course_id: int, assign_spec: List[tuple[str, float]]
+) -> tuple[str, int]:
+    status = 0
+    for assign_type, weight in assign_spec:
+        type, status = add_gen_assign(assign_type, weight, course_id)
+        if status != 0:
+            print(f"Failed to Create {assign_type}, already exists")
+    return ("Success!", status)
+
+
+def add_gen_assign(
+    assign_type: str, weight: float, course_id: int
+) -> tuple[AssignSpec | str, int]:
+    try:
+        with Session() as session:
+            course = session.get(Courses, course_id)
+            new_arch = AssignSpec(course=course, weight=weight, label=assign_type)
+            session.add(new_arch)
+            session.commit()
+            return (new_arch, 0)
+    except IntegrityError:
+        return ("Assignment type already exists", 1)
 
 
 ##Creates empty AssignmentGrades for each student
-def create_grades(assign: Assignment):
-    with Session.begin() as session:
-        assign = session.merge(assign)
-        students = assign.type.course.students
-        for student in students:
-            submittable = AssignmentGrade(assignment=assign, student=student)
-            session.add(submittable)
-    return ("Success!", 0)
+def create_grades(assign: Assignment) -> List[AssignmentGrade]:
+    try:
+        with Session.begin() as session:
+            assign = session.merge(assign)
+            students = assign.type.course.students
+            for student in students:
+                submittable = AssignmentGrade(assignment=assign, student=student)
+                session.add(submittable)
+        return ("Success!", 0)
+    except IntegrityError:
+        return ("Failed: Student already has submittable", -1)
 
+
+def new_assignment(course_id, assign_type: str, args: dict) -> tuple[Assignment, int]:
+    try:
+        with Session.begin() as session:
+            spec_stmt = select(AssignSpec).where(
+                AssignSpec.label == assign_type, AssignSpec.course_id == course_id
+            )
+            spec = session.execute(spec_stmt).scalar_one_or_none()
+            if spec is None:
+                return "Invalid Label", -1
+            assign = Assignment(
+                type=spec,
+                weight=args["weight"],
+                due_date=args["due_date"],
+                name=args["name"],
+            )
+            session.add(assign)
+        return (assign, 0)
+    except IntegrityError:
+        with Session() as session:
+            spec_stmt = select(AssignSpec.id).where(
+                AssignSpec.label == assign_type, AssignSpec.course_id == course_id
+            )
+            spec_id = session.execute(spec_stmt).scalar_one_or_none()
+            get_assign = select(Assignment).where(
+                Assignment.name == args["name"], Assignment.spec_id == spec_id
+            )
+            return (session.execute(get_assign).scalar_one_or_none(), 1)
+
+
+def assign_curve(obj: Courses| Assignment, curve_str) -> int:
+    with Session.begin() as session:
+        obj = session.merge(obj)
+        obj.curve = curve_str
+        session.commit()
+        return 0
 
 ##Depending on future work, may need to add ability to upload
-def submit(uid: int, assignment: Assignment):
+def submit(token: str, assignment: Assignment) -> tuple[String, int]:
+    user, utype = get_user(token)
+    if utype != "student":
+        return ("Not a Student", -2)
     with Session.begin() as session:
-        stmt = select(AssignmentGrade).where(student_id=uid, assign_id=assignment.id)
-        gradable = session.exec(stmt).scalar()
+        stmt = select(AssignmentGrade).where(
+            AssignmentGrade.student_id == user.id,
+            AssignmentGrade.assign_id == assignment.id,
+        )
+        gradable = session.execute(stmt).scalar()
         gradable.submitted = True
         gradable.time_submitted = get_time()
     return ("Success!", 0)
 
 
+def grade(key: str, submission: AssignmentGrade, grade) -> tuple[AssignmentGrade, int]:
+    user, utype = get_user(key)
+    if utype != "professor":
+        return ("Not a Professor", -2)
+    with Session() as session:
+        submission = session.merge(submission)
+        submission.submitted = True
+        submission.grade = grade
+        session.commit()
+        return (submission, 0)
 ##Returns all assignment specs
 def get_assign_specs(course: Courses):
     with Session() as session:
@@ -218,8 +298,18 @@ def get_assignments(assigns: AssignSpec):
         assigns = session.merge(assigns)
         return assigns.assignments
 
-
-def get_student_grade(uid, course: Courses):
+def get_grades(course: Courses):
+    with Session() as session:
+        course = session.merge(course)
+        students = course.students
+        curved_grades = [get_student_grade(None,course,student.id)[0]
+                   for student in students]
+        curved_grades.sort()
+        raw_grades = [get_raw_scores(course, student.id)[0] for student in students]
+        raw_grades.sort()
+        return curved_grades, raw_grades
+    
+def get_raw_scores(course: Courses, uid):
     with Session() as session:
         breakdown = session.merge(course).course_breakdown
         grade = 0.0
@@ -231,57 +321,107 @@ def get_student_grade(uid, course: Courses):
                 curve = assign.curve
                 lweight = assign.weight
                 stmt = select(AssignmentGrade.grade).where(
-                    student_id=uid, assign_id=assign.id
+                    AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
                 )
                 ##Assumption is that each student only submits one grade per assignment
                 assign_grade = session.execute(stmt).scalar()
-                lgrade += apply_curve(assign_grade, curve) * lweight
+                lgrade += assign_grade * lweight
             grade += weight * lgrade
-        grade = apply_curve(grade, course.curve)
+        return (grade, 0)
+
+
+def get_student_grade(key: str|None, course: Courses, uid=None) -> tuple[float| str, int] :
+    uid = uid
+    utype = "student"
+    if uid is None:
+        user, utype = get_user(key)
+        uid = user.id
+    if utype !="student":
+        return ("Invalid User", 0)
+    with Session() as session:
+        breakdown = session.merge(course).course_breakdown
+        grade = 0.0
+        for spec in breakdown:
+            weight = spec.weight
+            assignments = spec.assignments
+            lgrade = 0
+            for assign in assignments:
+                curve = assign.curve
+                lweight = assign.weight
+                stmt = select(AssignmentGrade.grade).where(
+                    AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
+                )
+                ##Assumption is that each student only submits one grade per assignment
+                assign_grade = session.execute(stmt).scalar()
+                lgrade += apply_curve(curve, assign_grade, assign) * lweight
+            grade += weight * lgrade
+        grade = apply_curve(course.curve, grade)
         return (grade, 0)
 
 
 ##Grades are stored in 0-100 format.
 ##This needs to take those values, and curve them according to
-def apply_curve(raw, curve):
+def apply_curve(curve, raw, data=None):
     if curve is None:
         return raw
-    return parse(raw, curve)
+    return parse(curve, raw,data)
 
 
-def create_course_instance(courseinfo: dict, token_str: str):
-    token = get_token(token_str)
-    if token.is_expired():
-        return ("Token has Expired", -1)
-    course_code = courseinfo["course code"]
-    get_course = select(CourseArchetype).where(
-        CourseArchetype.course_code == course_code
-    )
-    try:
-        with Session.begin() as session:
-            token = get_token(token_str)
-            login = session.merge(token).login
-            if login.type != "dean" and login.type != "professor":
-                return ("You Should not have permission to access this resource!", -2)
-            arch = session.execute(get_course).fetchone()
-            if arch is None:
-                return ("Overarching Course No Longer exists", -2)
-            arch = arch[0]
-            course = Courses(
-                prof_id=login.uid,
-                archetype=arch,
-                section=courseinfo["section"],
-                semester_id=courseinfo["semester id"],
-            )
-            session.add(course)
-    except IntegrityError:
-        return ("Course Already Exists!", -1)
-    return (course_code, 0)
+def get_time():
+    return datetime.datetime.now()
 
 
-##Token And Login Behavior
+##Course management
+def get_prof_courses(
+    key: str,
+) -> tuple[List[Courses], List[CourseArchetype], List[Semesters], int]:
+    user, utype = get_user(key)
+    with Session() as session:
+        user = session.merge(user)
+        if(utype != "professor"):
+            return ("Invalid UserType")
+        courses = user.courses
+        archetypes = []
+        semesters = []
+        for course in courses:
+            semesters.extend(get_semester(course.semester_id)[0])
+            archetypes.append(course.archetype)
+        return (courses, archetypes, semesters, 0)
+
+
+def reg_student(key: str, course_data: dict | None = None, course_id=None):
+    student = get_user(key)[0]
+    with Session.begin() as session:
+        student = session.merge(student)
+        if course_id is None:
+            course = get_course(course_data)
+            course.students.add(student)
+        else:
+            course = session.get(Courses, course_id)
+            course.students.add(student)
+    return ("Success", 0)
+
+
+##Token And Login Behavior/retrieval
+def login(uname, password) -> tuple[SessionToken, int]:
+    udata = select(Login).where(Login.uname == uname, Login.password == password)
+    # person = None
+    key = -1
+    with Session.begin() as session:
+        login = session.execute(udata).scalar_one_or_none()
+        if login is None:
+            return ("Username or Password is incorrect", -1)
+        # token = login_obj.token
+        if login.token.is_expired():
+            session.delete(login.token)
+            create_session_token(login, session)
+        else:
+            extend_token(login.token)
+    return (login.token, login.type, 0)
+
+
 def create_session_token(login_obj: Login, session):
-    token_key = secrets.token_bytes(64)
+    token_key = secrets.token_hex(16)
     creation_time = datetime.datetime.now(datetime.timezone.utc)
     expiration = creation_time + datetime.timedelta(hours=2)
     token = SessionToken(
@@ -294,65 +434,41 @@ def create_session_token(login_obj: Login, session):
     return token_key
 
 
-def get_token(token_str) -> SessionToken:
-    stmt = select(SessionToken).where(SessionToken.token_key == token_str)
-    with Session() as session:
-        elements = session.execute(stmt).fetchone()
-        if elements is None:
-            return "Invalid Token"
-        return elements[0]
+def get_token(key: str, session) -> SessionToken:
+    stmt = select(SessionToken).where(SessionToken.token_key == key)
+    token = session.execute(stmt).scalar_one_or_none()
+    if token is None or token.is_expired():
+        raise ExpiredToken("Token is invalid")
+    return token
 
 
 def extend_token(token: SessionToken):
     token.expires_at += datetime.timedelta(hours=2)
 
 
-def login(uname, password) -> tuple[SessionToken, int]:
-    udata = select(Login).where(Login.uname == uname, Login.password == password)
-    # person = None
-    key = -1
-    with Session.begin() as session:
-        first_el = session.execute(udata).fetchone()
-        if first_el is None:
-            return ("Username or Password is incorrect", -1)
-        ##Should actually return a session token\
-        login = first_el[0]
-        key = login.token.token_key
-        # token = login_obj.token
-        if login.token.is_expired():
-            session.delete(login.token)
-            key = create_session_token(login, session)
-    return (login.token, 0)
-
-
-##Course management
-def get_prof_courses(
-    token: str,
-) -> tuple[List[Courses], List[CourseArchetype], List[Semesters], int]:
-    user = get_user(token)
+def get_user(key: str) -> tuple[StudentData | ProfessorData | DeanData, str]:
     with Session() as session:
-        user = session.merge(user)
-        courses = user.courses
-        archetypes = []
-        semesters = []
-        for course in courses:
-            semesters.append(get_semester(course.semester_id))
-            archetypes.append(course.archetype)
-        return (courses, archetypes, semesters, 0)
+        token = get_token(key, session)
+        if token.is_expired():
+            raise ExpiredToken("Token Invalid")
+        login = token.login
+        extend_token(token)
+        session.commit()
+        usrtype = Tables[login.type]
+        return session.get(usrtype, login.uid), login.type
 
 
-##TODO: Finish this function
-def reg_student(token, course_data: dict):
-    token: str
-    student = get_user(token)
-    # Course data contains:
-    # course_code: str, section: str, semester: str
+##These functions are just for testing
+def get_login(uid, type) -> Login:
     with Session() as session:
-        arch_stmt = select(CourseArchetype.id).where(
-            CourseArchetype.course_code == course_data["course_code"]
-        )
-        ##Get the one and only element
-        arch_id = session.execute(arch_stmt).scalar()
-        sem_stmt = select(Semesters.id).where(Semesters.name == course_data["semester"])
-        sem_id = session.execute(sem_stmt).scalar()
-        course_stmt = session.execute()
+        stmt = select(Login).where(Login.uid == uid, Login.type == type)
+        element = session.execute(stmt).fetchall()
+        if len(element) < 1:
+            return "Something went Wrong"
+        return element[0].Login
+
+
+def get_token_from_udata(uid, type):
+    login = get_login(uid, type)
+    with Session() as session:
+        return session.merge(login).token.token_key
