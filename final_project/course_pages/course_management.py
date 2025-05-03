@@ -7,7 +7,8 @@ def professor_courseman(key: SessionToken):
     courses, archetypes, semesters, status = get_prof_courses(key)
     running_i = []
     labels = []
-    semester = st.selectbox("Select a semester to grade", [semester[0] for semester in semesters])    
+    semester = st.selectbox("Select a semester", [semester[0] for semester in semesters])    
+
     for i in range(len(courses)):
         if courses[i].running and courses[i].semester_id == semester.id:
             running_i.append(i)
@@ -17,10 +18,23 @@ def professor_courseman(key: SessionToken):
     for i in range(len(tabs)):
         with tabs[i]:
             course = courses[running_i[i]]
-            grades = get_grades(course)
-            print()
-            st.line_chart(grades[1], x_label="Students (Sorted)", y_label="Grades (Raw)")
-            st.line_chart(grades[0], x_label="Students (Sorted)", y_label="Grades (Curved)")
+            assignment_types = get_assign_specs(course)
+            no_el = "Course View"
+            full_list = assignment_types + [no_el]
+            assign_type = st.selectbox("Select an Assignment Type", [a_spec for a_spec in full_list])    
+            if assign_type == no_el:
+                grades = get_grades(course)
+                pass
+                # st.stop()
+            else:
+                grades = get_
+            # st.write()
+            raw, curved = st.columns(2)
+            with raw:
+                st.line_chart(grades[1], x_label="Students (Sorted)", y_label="Grades (Raw)")
+            with curved:
+                st.text_input("Want to test a new curve? Input Here")
+                st.line_chart(grades[0], x_label="Students (Sorted)", y_label="Grades (Curved)")
 
 def student_courseman(user: StudentData):
     st.write("Coming Soon!")

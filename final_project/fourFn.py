@@ -29,7 +29,7 @@ from pyparsing import (
 )
 import math
 import operator
-import stat_extend
+from stat_extend import *
 
 exprStack = []
 
@@ -55,6 +55,8 @@ def BNF():
     multop  :: '*' | '/'
     addop   :: '+' | '-'
     integer :: ['+' | '-'] '0'..'9'+
+    stats = :: mean | min | max | range | stddev
+
     atom    :: PI | E | real | fn '(' expr ')' | '(' expr ')' | stats | X
     factor  :: atom [ expop factor ]*
     term    :: factor [ multop factor ]*
@@ -139,13 +141,7 @@ fn = {
     "all": lambda *a: all(a),
 }
 ##My extension for statistical function support
-stats = {
-    "mean": stat_extend.mean,
-    "min": stat_extend.min,
-    "max": stat_extend.max,
-    "range": stat_extend.range,
-    "stddev": stat_extend.stddev,
-}
+stats = ["mean", "min", "max", "range", "stddev"]
 
 
 ##Data is the layer at which this is being passed in
@@ -171,9 +167,9 @@ def evaluate_stack(s, raw_score, data=None):
         args = reversed([evaluate_stack(s, raw_score, data) for _ in range(num_args)])
         return fn[op](*args)
     elif op in stats:
-        if not stat_extend.is_valid(data):
-            raise Exception("Statistics are not supported for this dtype") 
-        return stats[op](data)
+        if not is_valid(data):
+            raise Exception("Statistics are not supported for this dtype")
+        return stat_struct(op, data)
     elif op[0].isalpha():
         raise Exception("invalid identifier '%s'" % op)
     else:
@@ -183,19 +179,21 @@ def evaluate_stack(s, raw_score, data=None):
         except ValueError:
             return float(op)
 
+
 def parse(s, raw_score=None, data=None):
     exprStack[:] = []
     results = BNF().parseString(s, parseAll=True)
     val = evaluate_stack(exprStack[:], raw_score, data)
     return val
 
+
 if __name__ == "__main__":
 
     def test(s, expected, raw_score=None, data=None):
         exprStack[:] = []
         try:
+            val = parse(s,raw_score,data)
             results = BNF().parseString(s, parseAll=True)
-            val = evaluate_stack(exprStack[:], raw_score, data)
         except ParseException as pe:
             print(s, "failed parse:", str(pe))
         except Exception as e:

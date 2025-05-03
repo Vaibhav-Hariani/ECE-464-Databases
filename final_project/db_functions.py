@@ -298,14 +298,25 @@ def get_assignments(assigns: AssignSpec):
         assigns = session.merge(assigns)
         return assigns.assignments
 
-def get_grades(course: Courses):
+def get_grades(course: Courses=None, assign_type: AssignSpec=None, assign: Assignment=None ):
     with Session() as session:
         course = session.merge(course)
         students = course.students
-        curved_grades = [get_student_grade(None,course,student.id)[0]
-                   for student in students]
+        curved_grades = []
+        raw_grades = []
+        if assign_type:
+            curved_grades = [get_category_grade(None,assign,student.id, curve=True) for student in students]
+            raw_grades = [get_category_grade(None,assign,student.id, curve=False) for student in students]
+        elif assign:
+            curved_grades = [get_assignment_grade(None,assign,student.id, curve=True) for student in students]
+            raw_grades = [get_assignment_grade(None,assign,student.id, curve=False) for student in students]
+        elif course:
+
+            curved_grades = [get_student_grade(None,course,student.id)
+                    for student in students]
+            raw_grades = [get_raw_scores(course, student.id) for student in students]
+
         curved_grades.sort()
-        raw_grades = [get_raw_scores(course, student.id)[0] for student in students]
         raw_grades.sort()
         return curved_grades, raw_grades
     
@@ -325,9 +336,10 @@ def get_raw_scores(course: Courses, uid):
                 )
                 ##Assumption is that each student only submits one grade per assignment
                 assign_grade = session.execute(stmt).scalar()
+                assign_grade = apply_curve(curve,lgrade,assign)
                 lgrade += assign_grade * lweight
             grade += weight * lgrade
-        return (grade, 0)
+        return grade
 
 
 def get_student_grade(key: str|None, course: Courses, uid=None) -> tuple[float| str, int] :
@@ -342,21 +354,49 @@ def get_student_grade(key: str|None, course: Courses, uid=None) -> tuple[float| 
         breakdown = session.merge(course).course_breakdown
         grade = 0.0
         for spec in breakdown:
+            spec_grade = get_category_grade(key,spec,uid)
             weight = spec.weight
-            assignments = spec.assignments
-            lgrade = 0
-            for assign in assignments:
-                curve = assign.curve
-                lweight = assign.weight
-                stmt = select(AssignmentGrade.grade).where(
-                    AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
-                )
-                ##Assumption is that each student only submits one grade per assignment
-                assign_grade = session.execute(stmt).scalar()
-                lgrade += apply_curve(curve, assign_grade, assign) * lweight
-            grade += weight * lgrade
-        grade = apply_curve(course.curve, grade)
-        return (grade, 0)
+            grade += weight * spec_grade
+        grade = apply_curve(course.curve, grade, course)
+        return grade
+
+
+def get_assignment_grade(key: str| None, assign: Assignment, uid=None, curve=True):
+    uid = uid
+    utype = "student"
+    if uid is None:
+        user, utype = get_user(key)
+        uid = user.id
+    if utype !="student":
+        return ("Invalid User", 0)
+    with Session() as session:
+        curve = assign.curve
+        stmt = select(AssignmentGrade.grade).where(
+                AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
+            )
+        grade = session.execute(stmt).scalar_one_or_none()
+        if curve:
+            return apply_curve(curve,grade,assign)
+        return grade
+
+
+def get_category_grade(key: str| None, spec: AssignSpec, uid=None,curve=True):
+    uid = uid
+    utype = "student"
+    if uid is None:
+        user, utype = get_user(key)
+        uid = user.id
+    if utype !="student":
+        return ("Invalid User", 0)
+    with Session() as session:
+        assign_list = session.merge(spec).assignments
+        grade = 0
+        for assign in assign_list:
+            lgrade = get_assignment_grade(None, assign,uid,curve)
+            lgrade *= assign.weight
+            grade += lgrade
+        return grade
+
 
 
 ##Grades are stored in 0-100 format.
