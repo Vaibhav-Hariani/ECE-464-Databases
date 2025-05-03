@@ -3,43 +3,8 @@ from db_functions import get_raw_scores
 from sqlalchemy import func, select
 import statistics as stats
 
-# My extension for statistical function support
-# This should be different behavior depending
-# Currently, these functions are only supported for
-
-
-def course_mean(course: Courses):
-    with Session() as session:
-        course = session.merge(Courses)
-        grades = get_raw_scores(course)
-        return stats.mean(grades)
-    
-def course_max(course: Courses):
-    with Session() as session:
-        course = session.merge(Courses)
-        grades = get_raw_scores(course)
-        return max(grades)
-
-def course_min(course: Courses):
-    with Session() as session:
-        course = session.merge(Courses)
-        grades = get_raw_scores(course)
-        return min(grades)
-
-def course_range(course: Courses):
-    with Session() as session:
-        course = session.merge(Courses)
-        grades = get_raw_scores(course)
-        return range(grades)
-
-def course_stddev(course: Courses):
-    with Session() as session:
-        course = session.merge(Courses)
-        grades = get_raw_scores(course)
-        return stats.stdev(grades)
-    
 assign_funcs = {"mean": func.avg, "min": func.min, "max": func.max, "stddev": func.stddev}
-course_funcs = {"mean": course_mean, "min": course_min, "max": course_max, "stddev": course_stddev, "range": course_stddev}
+course_funcs = {"mean": stats.mean, "min": min, "max": max, "stddev": stats.stdev, "range": range}
 
 
 def is_valid(obj):
@@ -49,7 +14,8 @@ def is_valid(obj):
 
 def stat_struct(kw, obj: Assignment| Courses):
     if isinstance(obj, Courses):
-        return course_funcs(kw,obj)
+        grades = get_raw_scores(Courses)
+        return course_funcs[kw](grades)
     ##Behavior for assignments and assignments only
     if(kw == "range"):
         return stat_struct("max",obj) - stat_struct("min", obj)
