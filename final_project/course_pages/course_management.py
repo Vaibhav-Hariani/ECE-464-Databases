@@ -19,22 +19,24 @@ def professor_courseman(key: SessionToken):
         with tabs[i]:
             course = courses[running_i[i]]
             assignment_types = get_assign_specs(course)
-            no_el = "Course View"
-            full_list = assignment_types + [no_el]
-            assign_type = st.selectbox("Select an Assignment Type", [a_spec for a_spec in full_list])    
-            if assign_type == no_el:
-                grades = get_grades(course)
-                pass
-                # st.stop()
-            else:
-                grades = get_
-            # st.write()
+            assign_type = st.selectbox("Select an Assignment Type", assignment_types, index=None)    
+            assignment = None
+            curve = course.curve
+            data = course
+            if assign_type:
+                assignments = get_assignments(assign_type)
+                assignment = st.selectbox("Select An Assignment", assignments,index=None)
+            if assignment:
+                curve = assignment.curve
+                data = assignment
+            raw_grades, curved_grades = get_grades(course,assign_type,assignment)
+            curve = st.text_input("Using Curve:", value=curve)
             raw, curved = st.columns(2)
             with raw:
-                st.line_chart(grades[1], x_label="Students (Sorted)", y_label="Grades (Raw)")
+                st.line_chart(raw_grades, x_label="Students (Sorted)", y_label="Grades (Raw)")
             with curved:
-                st.text_input("Want to test a new curve? Input Here")
-                st.line_chart(grades[0], x_label="Students (Sorted)", y_label="Grades (Curved)")
+                curved_grades = [apply_curve(curve, score ,data) for score in raw_grades] 
+                st.line_chart(curved_grades, x_label="Students (Sorted)", y_label="Grades (Curved)")
 
 def student_courseman(user: StudentData):
     st.write("Coming Soon!")

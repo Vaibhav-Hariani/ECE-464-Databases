@@ -31,6 +31,12 @@ import math
 import operator
 from stat_extend import *
 
+from db_objects import *
+from db_functions import get_raw_scores
+from sqlalchemy import func, select
+import statistics as stats
+
+
 exprStack = []
 
 
@@ -45,9 +51,78 @@ def push_unary_minus(toks):
         else:
             break
 
+assign_funcs = {
+    "mean": func.avg,
+    "min": func.min,
+    "max": func.max,
+    "stddev": func.stddev,
+}
+course_funcs = {
+    "mean": stats.mean,
+    "min": min,
+    "max": max,
+    "stddev": stats.stdev,
+    "range": range,
+}
+
+def apply_curve(curve, raw, data=None):
+    if curve is None:
+        return raw
+    return parse(curve, raw,data)
+
+
+def is_valid(obj):
+    print(type(obj))
+    if isinstance(obj, Assignment) or isinstance(obj, Courses):
+        return True
+    return False
+
+
+def stat_struct(kw, obj: Assignment | Courses):
+    if isinstance(obj, Courses):
+        with Session() as session:
+            students = session.merge(obj).students
+            grades = [get_raw_scores(obj, student) for student in students]
+        return course_funcs[kw](grades)
+    ##Behavior for assignments and assignments only
+    if kw == "range":
+        return stat_struct("max", obj) - stat_struct("min", obj)
+    func = assign_funcs[kw]
+    stmt = select(func(AssignmentGrade.grade)).where(
+        AssignmentGrade.assign_id == obj.id
+    )
+    with Session() as session:
+        data = session.execute(stmt).scalar_one_or_none()
+    if data is None:
+        return 0
+    return data
+
+def get_scores(course: Courses):
+    with Session() as session:
+        course = session.merge(course)
+        breakdown = course.course_breakdown
+        students = course.students
+        grades = []
+        for student in students:
+            grade = 0.0
+            for spec in breakdown:
+                weight = spec.weight
+                assignments = spec.assignments
+                lgrade = 0
+                for assign in assignments:
+                    curve = assign.curve
+                    lweight = assign.weight
+                    stmt = select(AssignmentGrade.grade).where(
+                        AssignmentGrade.student_id==student.id, AssignmentGrade.assign_id==assign.id
+                    )
+                    ##Assumption is that each student only submits one grade per assignment
+                    assign_grade = session.execute(stmt).scalar_one()
+                    assign_grade = apply_curve(curve,lgrade,assign)
+                    lgrade += assign_grade * lweight
+                grade += weight * lgrade
+            grades.append(grade)
 
 bnf = None
-
 
 def BNF():
     """
@@ -168,7 +243,7 @@ def evaluate_stack(s, raw_score, data=None):
         return fn[op](*args)
     elif op in stats:
         if not is_valid(data):
-            raise Exception("Statistics are not supported for this dtype")
+            raise Exception(f"Statistics are not supported for dtype {type(data)}")
         return stat_struct(op, data)
     elif op[0].isalpha():
         raise Exception("invalid identifier '%s'" % op)
