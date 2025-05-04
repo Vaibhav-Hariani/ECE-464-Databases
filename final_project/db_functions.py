@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, delete
 import secrets
 from db_objects import *
-from curve_parser import apply_curve, get_raw_scores
+from curve_parser import apply_curve, get_raw_scores, test_parse
 from typing import TypeVar
 
 ##For analyzing return types:
@@ -253,12 +253,15 @@ def new_assignment(course_id, assign_type: str, args: dict) -> tuple[Assignment,
             return (session.execute(get_assign).scalar_one_or_none(), 1)
 
 
-def assign_curve(obj: Courses | Assignment, curve_str) -> int:
-    with Session.begin() as session:
-        obj = session.merge(obj)
-        obj.curve = curve_str
-        session.commit()
-        return 0
+def assign_curve(obj: Courses | Assignment, curve_str) -> tuple[str, int]:
+        msg, result = test_parse(curve_str)
+        if result != 0:
+            return msg, result
+        with Session.begin() as session:
+            obj = session.merge(obj)
+            obj.curve = curve_str
+            session.commit()
+            return msg, result
 
 
 ##Depending on future work, may need to add ability to upload

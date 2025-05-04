@@ -65,20 +65,6 @@ def create_element(element):
         "Garcia",
         "Miller",
         "Davis",
-        "Rodriguez",
-        "Martinez",
-        "Hernandez",
-        "Lopez",
-        "Gonzalez",
-        "Wilson",
-        "Anderson",
-        "Thomas",
-        "Taylor",
-        "Moore",
-        "Martin",
-        "Jackson",
-        "Lee",
-        "Perez",
         "Thompson",
         "White",
         "Harris",
@@ -148,8 +134,8 @@ def populate_professors():
 
 def create_course(prof: ProfessorData):
     login_creds = db_functions.get_login(prof.id, "professor")
-    token, status = db_functions.login(login_creds.uname, login_creds.password)
-    key = token.token_key
+    token = db_functions.login(login_creds.uname, login_creds.password)
+    key = token[0].token_key
     semester_id, status = db_functions.create_semester("Spring 2025")
     if status != 0:
         print("something went wrong creating semester")
@@ -176,23 +162,34 @@ if __name__ == "__main__":
         login = db_functions.get_login(prof.id, "professor")
         print(login.uid)
         print(f"{login.uname} {login.password}")
+
     login_test(Professors[-1], "professor")
     course, status = create_course(Professors[0])
+
     breakdown = [("Exams", 0.4), ("Homework", 0.4), ("Participation", 0.1)]
     breakdown = db_functions.create_breakdown(course.id, breakdown)
-    assign_args = {"weight": 0.5, "name": "midterm", "due_date": db_functions.get_time()}
-    assignment, status = db_functions.new_assignment(course.id, "Exams", assign_args)
+
+    assign_args = {"weight": 0.5, "name": "HW #1", "due_date": db_functions.get_time()}
+
+    assignment, status = db_functions.new_assignment(course.id, "Homework", assign_args)
+
     tokens = [db_functions.get_token_from_udata(student.id, "student") for student in Students]
+
     [db_functions.reg_student(token, course_id=course.id) for token in tokens]
     db_functions.create_grades(assignment)
+
     grades = db_functions.table_loader(AssignmentGrade)
     [db_functions.submit(token, assignment) for token in tokens]
 
     i = 0.0
     prof_token = db_functions.get_token_from_udata(Professors[0].id, "professor")
-    for student_grade in grades:
+    for student_grade in grades[:-10]:
         grade, status = db_functions.grade(prof_token, student_grade, i)
-        i+=5
+        i+=2
+    for student_grade in grades[-10:]:
+        grade, status = db_functions.grade(prof_token, student_grade, i)
+        i+=4
+
     for token in tokens:
         print(db_functions.get_student_grade(token, course))    
     

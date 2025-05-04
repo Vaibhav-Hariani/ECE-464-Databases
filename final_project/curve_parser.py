@@ -33,6 +33,7 @@ from db_objects import *
 from sqlalchemy import func, select
 from sqlalchemy.orm import class_mapper
 import statistics as stats
+from functools import cache
 
 
 exprStack = []
@@ -63,6 +64,7 @@ course_funcs = {
     "range": range,
 }
 
+@cache
 def apply_curve(curve, raw, data=None):
     if curve is None:
         return raw
@@ -79,7 +81,7 @@ def stat_struct(kw, obj: Assignment | Courses):
     if obj.__table__ == Courses.__table__:
         with Session() as session:
             students = session.merge(obj).students
-            grades = [get_raw_scores(obj, student) for student in students]
+            grades = [get_raw_scores(obj, student.id) for student in students]
         return course_funcs[kw](grades)
     ##Behavior for assignments and assignments only
     if kw == "range":
@@ -94,7 +96,7 @@ def stat_struct(kw, obj: Assignment | Courses):
         return 0
     return data
     
-
+@cache
 def get_scores(course: Courses):
     with Session() as session:
         course = session.merge(course)
@@ -105,7 +107,7 @@ def get_scores(course: Courses):
             grades.append(grade)
         return grades
 
-def get_raw_scores(course: Courses, uid):
+def get_raw_scores(course: Courses, uid:int):
     with Session() as session:
         breakdown = session.merge(course).course_breakdown
         grade = 0.0
@@ -114,7 +116,6 @@ def get_raw_scores(course: Courses, uid):
             assignments = spec.assignments
             lgrade = 0
             for assign in assignments:
-                print(assign.name)
                 curve = assign.curve
                 lweight = assign.weight
                 stmt = select(AssignmentGrade.grade).where(
@@ -122,7 +123,7 @@ def get_raw_scores(course: Courses, uid):
                 )
                 ##Assumption is that each student only submits once per assignment
                 assign_grade = session.execute(stmt).scalar()
-                assign_grade = apply_curve(curve,lgrade,assign)
+                assign_grade = apply_curve(curve,assign_grade,assign)
                 lgrade += assign_grade * lweight
             grade += weight * lgrade
         return grade
@@ -266,6 +267,12 @@ def parse(s, raw_score=None, data=None):
     val = evaluate_stack(exprStack[:], raw_score, data)
     return val
 
+def test_parse(s):
+    try:
+        results = BNF().parse_string(s,parseAll=True)
+        return "Success!", 0
+    except:
+        return "Parse Failed", -1
 
 if __name__ == "__main__":
 
