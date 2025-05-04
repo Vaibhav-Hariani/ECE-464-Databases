@@ -14,7 +14,6 @@ def professor_courseman(key: SessionToken):
             running_i.append(i)
             labels.append(archetypes[i].course_name)
     tabs = st.tabs(labels)
-
     for i in range(len(tabs)):
         with tabs[i]:
             course = courses[running_i[i]]
@@ -25,18 +24,29 @@ def professor_courseman(key: SessionToken):
             data = course
             if assign_type:
                 assignments = get_assignments(assign_type)
-                assignment = st.selectbox("Select An Assignment", assignments,index=None)
-            if assignment:
+                if len(assignments) > 0:
+                    assignment = st.selectbox("Select An Assignment", assignments,index=None)
+                else:
+                    st.warning("No Data For This Assignment Type")
+                    st.stop()
+                curve = 'x'
+            if assignment and assign_type:
                 curve = assignment.curve
                 data = assignment
-            raw_grades, curved_grades = get_grades(course,assign_type,assignment)
-            curve = st.text_input("Using Curve:", value=curve)
+            if (not assign_type) or assignment:
+                curve = st.text_input("Using Curve:", value=curve)                
+            raw_grades = get_grades(course,assign_type,assignment)
             raw, curved = st.columns(2)
+            # st.write("Something")
             with raw:
                 st.line_chart(raw_grades, x_label="Students (Sorted)", y_label="Grades (Raw)")
-            with curved:
-                curved_grades = [apply_curve(curve, score ,data) for score in raw_grades] 
-                st.line_chart(curved_grades, x_label="Students (Sorted)", y_label="Grades (Curved)")
+            if (not assign_type) or assignment:
+                with curved:
+                    try:
+                        curved_grades = [apply_curve(curve, score ,data) for score in raw_grades]
+                        st.line_chart(curved_grades, x_label="Students (Sorted)", y_label="Grades (Curved)")
+                    except:
+                        st.error("Curve Failed to Apply: Remember, X should be the only variable.") 
 
 def student_courseman(user: StudentData):
     st.write("Coming Soon!")

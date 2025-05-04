@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, delete
 import secrets
 from db_objects import *
-from curve_parser import apply_curve
+from curve_parser import apply_curve, get_raw_scores
 from typing import TypeVar
 
 ##For analyzing return types:
@@ -301,42 +301,29 @@ def get_assignments(assigns: AssignSpec):
         assigns = session.merge(assigns)
         return assigns.assignments
 
-
+##Uncurved grades
 def get_grades(
     course: Courses = None, assign_type: AssignSpec = None, assign: Assignment = None
 ):
     with Session() as session:
         course = session.merge(course)
         students = course.students
-        curved_grades = []
         raw_grades = []
         if assign:
-            curved_grades = [
-                get_assignment_grade(None, assign, student.id, curve=True)
-                for student in students
-            ]
             raw_grades = [
-                get_assignment_grade(None, assign, student.id, curve=False)
+                get_assignment_grade(None, assign, student.id, use_curve=False)
                 for student in students
             ]
         elif assign_type:
-            curved_grades = [
-                get_category_grade(None, assign, student.id, curve=True)
-                for student in students
-            ]
             raw_grades = [
-                get_category_grade(None, assign, student.id, curve=False)
+                get_category_grade(None, assign_type, student.id, use_curve=False)
                 for student in students
             ]
         elif course:
-            curved_grades = [
-                get_student_grade(None, course, student.id) for student in students
-            ]
             raw_grades = [get_raw_scores(course, student.id) for student in students]
 
-        curved_grades.sort()
         raw_grades.sort()
-        return curved_grades, raw_grades
+        return raw_grades
 
 
 def get_student_grade(
@@ -360,7 +347,7 @@ def get_student_grade(
         return grade
 
 
-def get_assignment_grade(key: str | None, assign: Assignment, uid=None, curve=True):
+def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curve=True):
     uid = uid
     utype = "student"
     if uid is None:
@@ -374,12 +361,12 @@ def get_assignment_grade(key: str | None, assign: Assignment, uid=None, curve=Tr
             AssignmentGrade.student_id == uid, AssignmentGrade.assign_id == assign.id
         )
         grade = session.execute(stmt).scalar_one_or_none()
-        if curve:
+        if use_curve:
             return apply_curve(curve, grade, assign)
         return grade
 
 
-def get_category_grade(key: str | None, spec: AssignSpec, uid=None, curve=True):
+def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=True):
     uid = uid
     utype = "student"
     if uid is None:
@@ -391,7 +378,7 @@ def get_category_grade(key: str | None, spec: AssignSpec, uid=None, curve=True):
         assign_list = session.merge(spec).assignments
         grade = 0
         for assign in assign_list:
-            lgrade = get_assignment_grade(None, assign, uid, curve)
+            lgrade = get_assignment_grade(None, assign, uid, use_curve)
             lgrade *= assign.weight
             grade += lgrade
         return grade

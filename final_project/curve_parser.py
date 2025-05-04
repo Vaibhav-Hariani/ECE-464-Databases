@@ -29,11 +29,9 @@ from pyparsing import (
 )
 import math
 import operator
-from stat_extend import *
-
 from db_objects import *
-from db_functions import get_raw_scores
 from sqlalchemy import func, select
+from sqlalchemy.orm import class_mapper
 import statistics as stats
 
 
@@ -72,14 +70,13 @@ def apply_curve(curve, raw, data=None):
 
 
 def is_valid(obj):
-    print(type(obj))
-    if isinstance(obj, Assignment) or isinstance(obj, Courses):
+    if obj.__tablename__ == Assignment.__tablename__ or obj.__tablename__ == Courses.__tablename__:
         return True
     return False
 
 
 def stat_struct(kw, obj: Assignment | Courses):
-    if isinstance(obj, Courses):
+    if obj.__table__ == Courses.__table__:
         with Session() as session:
             students = session.merge(obj).students
             grades = [get_raw_scores(obj, student) for student in students]
@@ -96,31 +93,39 @@ def stat_struct(kw, obj: Assignment | Courses):
     if data is None:
         return 0
     return data
+    
 
 def get_scores(course: Courses):
     with Session() as session:
         course = session.merge(course)
-        breakdown = course.course_breakdown
         students = course.students
         grades = []
         for student in students:
-            grade = 0.0
-            for spec in breakdown:
-                weight = spec.weight
-                assignments = spec.assignments
-                lgrade = 0
-                for assign in assignments:
-                    curve = assign.curve
-                    lweight = assign.weight
-                    stmt = select(AssignmentGrade.grade).where(
-                        AssignmentGrade.student_id==student.id, AssignmentGrade.assign_id==assign.id
-                    )
-                    ##Assumption is that each student only submits one grade per assignment
-                    assign_grade = session.execute(stmt).scalar_one()
-                    assign_grade = apply_curve(curve,lgrade,assign)
-                    lgrade += assign_grade * lweight
-                grade += weight * lgrade
+            grade = get_raw_scores(course, student.id)
             grades.append(grade)
+        return grades
+
+def get_raw_scores(course: Courses, uid):
+    with Session() as session:
+        breakdown = session.merge(course).course_breakdown
+        grade = 0.0
+        for spec in breakdown:
+            weight = spec.weight
+            assignments = spec.assignments
+            lgrade = 0
+            for assign in assignments:
+                print(assign.name)
+                curve = assign.curve
+                lweight = assign.weight
+                stmt = select(AssignmentGrade.grade).where(
+                    AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
+                )
+                ##Assumption is that each student only submits once per assignment
+                assign_grade = session.execute(stmt).scalar()
+                assign_grade = apply_curve(curve,lgrade,assign)
+                lgrade += assign_grade * lweight
+            grade += weight * lgrade
+        return grade
 
 bnf = None
 
