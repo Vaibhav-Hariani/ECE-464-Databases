@@ -323,7 +323,7 @@ def get_grades(
                 for student in students
             ]
         elif course:
-            raw_grades = [get_raw_scores(course, student.id) for student in students]
+            raw_grades = [get_raw_scores(course, student.id, session) for student in students]
 
         raw_grades.sort()
         return raw_grades
@@ -340,15 +340,13 @@ def get_student_grade(
     if utype != "student":
         return ("Invalid User", 0)
     with Session() as session:
-        breakdown = session.merge(course).course_breakdown
-        grade = 0.0
-        for spec in breakdown:
-            spec_grade = get_category_grade(key, spec, uid)
-            weight = spec.weight
-            grade += weight * spec_grade
-        grade = apply_curve(course.curve, grade, course)
-        return grade
+        return get_raw_scores(course, uid, session)
 
+def update_weight(obj, new_weight):
+    with Session() as session:
+        obj = session.merge(obj)
+        obj.weight = new_weight
+        session.commit()
 
 def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curve=True):
     uid = uid

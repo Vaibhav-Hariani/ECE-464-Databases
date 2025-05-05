@@ -20,34 +20,50 @@ def professor_courseman(key: SessionToken):
             assignment_types = get_assign_specs(course)
             assign_type = st.selectbox("Assignment Type", assignment_types, index=None)    
             assignment = None
-            curve = course.curve
             data = course
             if assign_type:
                 assignments = get_assignments(assign_type)
+                data = assign_type
                 if len(assignments) > 0:
                     assignment = st.selectbox("Assignment", assignments,index=None)
+                    if assignment:
+                        data = assignment            
                 else:
                     st.warning("No Data For This Assignment Type")
                     st.stop()
-                curve = 'x'
-            if assignment and assign_type:
-                curve = assignment.curve
-                data = assignment
-            if (not assign_type) or assignment:
-                curve = st.text_input("Using Curve:", value=curve)
-                st.button("Apply this curve",on_click=assign_curve,args=(data,curve),icon=":material/done_outline:")
-                # assign_curve(data,curve)
+
+            curve = 'x'
+
+            enabled = (not assign_type) or assignment 
+            if enabled:
+                curve = data.curve
+                num_cols = 2
             else:
-                st.write("Curves not supported for this element. Curves can only be applied to specific assignments or course-wide.")                
+                num_cols = 1
+                st.warning("Curves not supported for this element. Curves can only be applied to specific assignments or course-wide.")                
+            text_box, button_box = st.columns(2,vertical_alignment="bottom")
+            curve = text_box.text_input("Using Curve:", value=curve,disabled=(not enabled))
+            button_box.button("Apply this curve",on_click=assign_curve,args=(data,curve),icon=":material/done_outline:", disabled=(not enabled))
+            
+            if assign_type:
+                text_box, button_box = st.columns(2,vertical_alignment="bottom")
+                weight = data.weight
+                test_weight = text_box.text_input("Weight:",value=str(weight))
+                try:
+                    button_box.button("Update Weight",on_click=update_weight,args=(data,float(test_weight)),icon=":material/done_outline:")
+                except:
+                    st.error("Invalid Input for weight")
+
             raw_grades = get_grades(course,assign_type,assignment)
-            raw, curved = st.columns(2)
+
+            cols = st.columns(num_cols)
             # st.write("Something")
-            with raw:
+            with cols[0]:
                 st.line_chart(raw_grades, x_label="Students (Sorted)", y_label="Grades (Raw)")
-            if (not assign_type) or assignment:
-                with curved:
+            if enabled:
+                with cols[1]:
                     try:
-                        curved_grades = [apply_curve(curve, score ,data) for score in raw_grades]
+                        curved_grades = [apply_curve(curve, score,data) for score in raw_grades]
                         st.line_chart(curved_grades, x_label="Students (Sorted)", y_label="Grades (Curved)")
                     except:
                         st.error("Curve Failed to Apply: For a guide, check ****. Remember, X should be the only variable.") 

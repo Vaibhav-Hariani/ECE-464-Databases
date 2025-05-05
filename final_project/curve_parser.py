@@ -31,7 +31,8 @@ import math
 import operator
 from db_objects import *
 from sqlalchemy import func, select
-from sqlalchemy.orm import class_mapper
+
+from sqlalchemy.orm import joinedload
 import statistics as stats
 from functools import cache
 
@@ -65,7 +66,7 @@ course_funcs = {
 }
 
 @cache
-def apply_curve(curve, raw, data=None):
+def apply_curve(curve: str, raw: Assignment | Courses, data=None):
     if curve is None:
         return raw
     return parse(curve, raw,data)
@@ -76,12 +77,13 @@ def is_valid(obj):
         return True
     return False
 
-
+@cache
 def stat_struct(kw, obj: Assignment | Courses):
     if obj.__table__ == Courses.__table__:
         with Session() as session:
-            students = session.merge(obj).students
-            grades = [get_raw_scores(obj, student.id) for student in students]
+            obj = session.merge(obj)
+            students = obj.students
+            grades = [get_raw_scores(obj, student.id, session) for student in students]
         return course_funcs[kw](grades)
     ##Behavior for assignments and assignments only
     if kw == "range":
@@ -96,40 +98,38 @@ def stat_struct(kw, obj: Assignment | Courses):
         return 0
     return data
     
-@cache
 def get_scores(course: Courses):
     with Session() as session:
         course = session.merge(course)
         students = course.students
-        grades = []
-        for student in students:
-            grade = get_raw_scores(course, student.id)
-            grades.append(grade)
+        grades = [get_raw_scores(course, student.id, session) for student in students]
         return grades
 
-def get_raw_scores(course: Courses, uid:int):
-    with Session() as session:
-        breakdown = session.merge(course).course_breakdown
-        grade = 0.0
-        for spec in breakdown:
-            weight = spec.weight
-            assignments = spec.assignments
-            lgrade = 0
-            for assign in assignments:
-                curve = assign.curve
-                lweight = assign.weight
-                stmt = select(AssignmentGrade.grade).where(
-                    AssignmentGrade.student_id==uid, AssignmentGrade.assign_id==assign.id
-                )
-                ##Assumption is that each student only submits once per assignment
-                assign_grade = session.execute(stmt).scalar()
-                assign_grade = apply_curve(curve,assign_grade,assign)
-                lgrade += assign_grade * lweight
-            grade += weight * lgrade
-        return grade
+
+def get_raw_scores(course: Courses, uid:int, session): # type: ignore
+    breakdown = course.course_breakdown
+    grade = 0.0
+    for spec in breakdown:
+        weight = spec.weight
+        assignments = spec.assignments
+        lgrade = 0
+        assignment_ids = [assign.id for assign in assignments]
+        # curve = assign.curve
+        # lweight = assign.weight
+        stmt = select(AssignmentGrade).where(
+            AssignmentGrade.student_id == uid, AssignmentGrade.assign_id.in_(assignment_ids)
+        ).options(joinedload(AssignmentGrade.assignment))  # Eager load Assignment for curve
+        student_grades = session.execute(stmt).scalars().all()
+        grades_map = {sg.assign_id: sg.grade for sg in student_grades}        
+        for assign in assignments:
+            assign_grade = grades_map[assign.id]
+            assign_grade = weight * apply_curve(assign.curve,assign_grade,assign)
+            lgrade += assign_grade
+        grade += weight * lgrade
+    return grade
+
 
 bnf = None
-
 def BNF():
     """
     expop   :: '^'
