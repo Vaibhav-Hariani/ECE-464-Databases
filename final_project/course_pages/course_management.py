@@ -15,6 +15,11 @@ def professor_courseman(key: SessionToken):
         if courses[i].running and courses[i].semester_id == semester.id:
             running_i.append(i)
             labels.append(archetypes[i].course_name)
+
+    if len(labels) == 0:
+        st.warning("No Data for Professor")
+        st.stop()
+
     tabs = st.tabs(labels)
     for i in range(len(tabs)):
         with tabs[i]:

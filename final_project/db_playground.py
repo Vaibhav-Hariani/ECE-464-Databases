@@ -17,8 +17,18 @@ def add_password():
     passw += random.choice(random_punct)
     return passw
 
+def create_stu(element, fname, lname,passw=None):
+    username = fname + "_" + lname
+    email = username + "@copperonion.edu"
+    element["name"] = fname + " " + lname
+    element["uname"] = username
+    element["email"] = email
+    if passw is None:
+        passw = add_password()
+    element["pass"] = passw
 
-def create_element(element):
+
+def random_student(element):
     # --- Lists of names for realistic generation ---
     ##These lists are courtesy of Gemini
     first_names = [
@@ -78,18 +88,20 @@ def create_element(element):
     ]
     fname = random.choice(first_names)
     lname = random.choice(last_names)
-    username = fname + "_" + lname
-    email = username + "@copperonion.edu"
-    element["name"] = fname + " " + lname
-    element["uname"] = username
-    element["email"] = email
-    element["pass"] = add_password()
+    create_stu(element,fname,lname)
 
 
 def populate_students(NUM_STUDENTS=21):
+    element = {"obj_class": "student"}
     for i in range(NUM_STUDENTS):
-        element = {"obj_class": "student"}
-        create_element(element)
+        random_student(element)
+        response = db_functions.create_user(element)
+        print(response)
+    for student in [("Jacob", "Koziej"), ("Joya", "Debi"), ("Isaiah", "Rivera"), ("Nick", "Storniolo"), ("Evan" ,"Rosenfeld"), ("Alek", "Turkmen"), ("Grace", "Ee"), ("Surinderpal", "Singh")]:
+        fname = student[0]
+        lname = student[1]
+        passw= "databases"
+        create_stu(element,fname,lname,passw)
         response = db_functions.create_user(element)
         print(response)
 
@@ -107,25 +119,25 @@ def populate_professors():
     major_id = db_functions.create_major("Electrical Engineering")
     element = {"obj_class": "professor", "major_id": major_id}
     ##Starting with just two professors
-    fname = "Deli"
+    fname = "David"
     lname = "Katz"
     username = fname + "_" + lname
     email = username + "@copperonion.edu"
     element["name"] = fname + " " + lname
     element["uname"] = username
     element["email"] = email
-    element["pass"] = "VaibhavGetsAnA!"
+    element["pass"] = "data"
     ret = db_functions.create_user(element)
     print(ret[0])
 
-    fname = "NH"
+    fname = "Sam"
     lname = "Keene"
     username = fname + "_" + lname
     email = username + "@copperonion.edu"
     element["name"] = fname + " " + lname
     element["uname"] = username
     element["email"] = email
-    element["pass"] = "VaibhavGetsAnA!"
+    element["pass"] = "based"
     ret = db_functions.create_user(element)
     print(ret[0])
 
@@ -147,12 +159,12 @@ def create_course(prof: ProfessorData):
 
 
 if __name__ == "__main__":
-    # populate_students()
+    populate_students()
     Students = db_functions.table_loader(StudentData)
     for student in Students:
         print(student.name)
         print("Done printing students")
-    # populate_professors()
+    populate_professors()
     Professors = db_functions.table_loader(ProfessorData)
     for prof in Professors:
         print(prof.name)
@@ -166,9 +178,34 @@ if __name__ == "__main__":
     breakdown = [("Exams", 0.4), ("Homework", 0.4), ("Participation", 0.1)]
     breakdown = db_functions.create_breakdown(course.id, breakdown)
 
-    assign_args = {"weight": 0.5, "name": "HW #1", "due_date": db_functions.get_time()}
-
+    assign_args = {"weight": 1, "name": "HW #1", "due_date": db_functions.get_time()}
     assignment, status = db_functions.new_assignment(course.id, "Homework", assign_args)
+
+    tokens = [
+        db_functions.get_token_from_udata(student.id, "student") for student in Students
+    ]
+
+    [db_functions.reg_student(token, course_id=course.id) for token in tokens]
+    db_functions.create_grades(assignment)
+
+    grades = db_functions.table_loader(AssignmentGrade)
+    [db_functions.submit(token, assignment) for token in tokens]
+
+    assign_args = {"weight": 0.5, "name": "Midterm", "due_date": db_functions.get_time()}
+    assignment, status = db_functions.new_assignment(course.id, "Exams", assign_args)
+
+
+    for token in tokens:
+        print(db_functions.get_student_grade(token, course))
+
+    i = 0.0
+    prof_token = db_functions.get_token_from_udata(Professors[0].id, "professor")
+    for student_grade in grades[:-10]:
+        grade, status = db_functions.grade(prof_token, student_grade, i)
+        i += 2
+    for student_grade in grades[-10:]:
+        grade, status = db_functions.grade(prof_token, student_grade, i)
+        i += 4
 
     tokens = [
         db_functions.get_token_from_udata(student.id, "student") for student in Students
@@ -188,9 +225,6 @@ if __name__ == "__main__":
     for student_grade in grades[-10:]:
         grade, status = db_functions.grade(prof_token, student_grade, i)
         i += 4
-
-    for token in tokens:
-        print(db_functions.get_student_grade(token, course))
 
     curve = "x * 5 / stddev"
     db_functions.assign_curve(assignment, curve)
