@@ -1,7 +1,16 @@
 import os
 import datetime
 from typing import List, Optional
-from sqlalchemy import Column, DateTime, Index, String, Table, UniqueConstraint, create_engine, ForeignKey
+from sqlalchemy import (
+    Column,
+    DateTime,
+    event,
+    String,
+    Table,
+    UniqueConstraint,
+    create_engine,
+    ForeignKey,
+)
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -22,12 +31,12 @@ url = URL.create(
     password="password",
     host="localhost",
     port="5432",
-    database="postgres"
+    database="postgres",
 )
 
 engine = create_engine(url, echo=False)
 Session = sessionmaker(engine, expire_on_commit=False)
-#Postgre: postgresql://username:password@host:port/database_name
+# Postgre: postgresql://username:password@host:port/database_name
 
 
 class Base(DeclarativeBase):
@@ -36,6 +45,7 @@ class Base(DeclarativeBase):
 
 class ExpiredToken(Exception):
     pass
+
 
 ##Association table for bi-directional many to many
 ##Used for student to course relationship
@@ -60,6 +70,7 @@ class Login(Base):
     def __repr__(self):
         return self.uname
 
+
 class StudentData(Base):
     __tablename__ = "student_data"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -68,7 +79,10 @@ class StudentData(Base):
     reg_courses: Mapped[List["Courses"]] = relationship(
         secondary=student_course_assoc, back_populates="students"
     )
-    submissions: Mapped[List["AssignmentGrade"]] = relationship(back_populates="student")
+    submissions: Mapped[List["AssignmentGrade"]] = relationship(
+        back_populates="student"
+    )
+
     def __repr__(self):
         return self.name
 
@@ -80,6 +94,7 @@ class ProfessorData(Base):
     email: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
     courses: Mapped[List["Courses"]] = relationship(back_populates="prof")
+
     def __str__(self):
         return f"{self.name}"
 
@@ -90,6 +105,7 @@ class DeanData(Base):
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
     major_id: Mapped[int]
+
     def __str__(self):
         return f"{self.name}"
 
@@ -99,6 +115,7 @@ class Major_Labels(Base):
     __tablename__ = "major"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
+
     def __str__(self):
         return f"{self.name}"
 
@@ -110,6 +127,7 @@ class CourseArchetype(Base):
     course_code: Mapped[str] = mapped_column(unique=True)
     courses: Mapped[set["Courses"]] = relationship(back_populates="archetype")
     major_id: Mapped[int]
+
     def __str__(self):
         return f"{self.course_name}"
 
@@ -118,6 +136,7 @@ class Semesters(Base):
     __tablename__ = "semesters"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(unique=True)
+
     def __str__(self):
         return self.name
 
@@ -139,15 +158,19 @@ class Courses(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint('course_id', 'semester_id', 'section', name='uq_course_sem_section'),
-    # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
-    # Index('ix_course_semester', 'course_id', 'semester_id'),
+        UniqueConstraint(
+            "course_id", "semester_id", "section", name="uq_course_sem_section"
+        ),
+        # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
+        # Index('ix_course_semester', 'course_id', 'semester_id'),
     )
+
     def __str__(self):
         with Session() as session:
             course_code = session.merge(self).archetype.course_code
-            sem_name = session.get(Semesters,self.semester_id).name
+            sem_name = session.get(Semesters, self.semester_id).name
             return f"{course_code}, Section {self.section} in {sem_name}"
+
 
 ##General classes for all assignments
 class AssignSpec(Base):
@@ -176,20 +199,13 @@ class Assignment(Base):
     name: Mapped[str]
     curve: Mapped[Optional[str]]
     __table_args__ = (
-        UniqueConstraint('spec_id', 'name',  name='uq_spec_name'),
-    # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
-    # Index('ix_course_semester', 'course_id', 'semester_id'),
+        UniqueConstraint("spec_id", "name", name="uq_spec_name"),
+        # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
+        # Index('ix_course_semester', 'course_id', 'semester_id'),
     )
+
     def __str__(self):
         return f"{self.name}"
-
-
-
-# class StudentCourseLayer(Base):
-#     __tablename__ = "student_course_layer"
-#     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-#     student_id: Mapped[int]
-#     course_id: Mapped[int]
 
 
 class AssignmentGrade(Base):
@@ -202,10 +218,11 @@ class AssignmentGrade(Base):
     time_submitted: Mapped[Optional[datetime.datetime]]
     student_id = mapped_column(ForeignKey("student_data.id"))
     student: Mapped["StudentData"] = relationship(back_populates="submissions")
+    curved_score: Mapped[int] = mapped_column(default=0.0)
     __table_args__ = (
-        UniqueConstraint('student_id', 'assign_id',  name='uq_submissions'),
-    # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
-    # Index('ix_course_semester', 'course_id', 'semester_id'),
+        UniqueConstraint("student_id", "assign_id", name="uq_submissions"),
+        # 2. Index for faster lookup (Goal 1) - queries filtering by course AND semester
+        # Index('ix_course_semester', 'course_id', 'semester_id'),
     )
 
 
@@ -232,10 +249,3 @@ class SessionToken(Base):
 Base.metadata.create_all(engine)
 if __name__ == "__main__":
     pass
-    # with Session(engine) as session:
-    #     pass
-
-    # print(app.config["SQLALCHEMY_DATABASE_URI"])1290
-    # with app.app_context():
-    #     ##Create all the models
-    #     db.create_all()

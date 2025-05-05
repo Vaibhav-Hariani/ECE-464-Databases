@@ -32,9 +32,7 @@ import operator
 from db_objects import *
 from sqlalchemy import func, select
 
-from sqlalchemy.orm import joinedload
 import statistics as stats
-from functools import cache
 
 
 exprStack = []
@@ -51,6 +49,7 @@ def push_unary_minus(toks):
         else:
             break
 
+
 assign_funcs = {
     "mean": func.avg,
     "min": func.min,
@@ -65,19 +64,22 @@ course_funcs = {
     "range": range,
 }
 
-@cache
-def apply_curve(curve: str, raw: Assignment | Courses, data=None):
-    if curve is None:
+
+def apply_curve(curve: str, raw: float, data: Assignment | Courses = None):
+    if curve is None or curve == " ":
         return raw
-    return parse(curve, raw,data)
+    return parse(curve, raw, data)
 
 
 def is_valid(obj):
-    if obj.__tablename__ == Assignment.__tablename__ or obj.__tablename__ == Courses.__tablename__:
+    if (
+        obj.__tablename__ == Assignment.__tablename__
+        or obj.__tablename__ == Courses.__tablename__
+    ):
         return True
     return False
 
-@cache
+
 def stat_struct(kw, obj: Assignment | Courses):
     if obj.__table__ == Courses.__table__:
         with Session() as session:
@@ -97,7 +99,8 @@ def stat_struct(kw, obj: Assignment | Courses):
     if data is None:
         return 0
     return data
-    
+
+
 def get_scores(course: Courses):
     with Session() as session:
         course = session.merge(course)
@@ -106,30 +109,29 @@ def get_scores(course: Courses):
         return grades
 
 
-def get_raw_scores(course: Courses, uid:int, session): # type: ignore
+def get_raw_scores(course: Courses, uid: int, session):  # type: ignore
     breakdown = course.course_breakdown
     grade = 0.0
     for spec in breakdown:
         weight = spec.weight
         assignments = spec.assignments
-        lgrade = 0
         assignment_ids = [assign.id for assign in assignments]
         # curve = assign.curve
         # lweight = assign.weight
-        stmt = select(AssignmentGrade).where(
-            AssignmentGrade.student_id == uid, AssignmentGrade.assign_id.in_(assignment_ids)
-        ).options(joinedload(AssignmentGrade.assignment))  # Eager load Assignment for curve
-        student_grades = session.execute(stmt).scalars().all()
-        grades_map = {sg.assign_id: sg.grade for sg in student_grades}        
-        for assign in assignments:
-            assign_grade = grades_map[assign.id]
-            assign_grade = weight * apply_curve(assign.curve,assign_grade,assign)
-            lgrade += assign_grade
-        grade += weight * lgrade
+        stmt = select(func.sum(AssignmentGrade.curved_score)).where(
+            AssignmentGrade.student_id == uid,
+            AssignmentGrade.assign_id.in_(assignment_ids),
+        )  # Eager load Assignment for curve
+        grades = session.execute(stmt).scalars().one_or_none()
+        if grades is None:
+            grades = 0
+        grade += weight * grades
     return grade
 
 
 bnf = None
+
+
 def BNF():
     """
     expop   :: '^'
@@ -267,19 +269,21 @@ def parse(s, raw_score=None, data=None):
     val = evaluate_stack(exprStack[:], raw_score, data)
     return val
 
+
 def test_parse(s):
     try:
-        results = BNF().parse_string(s,parseAll=True)
+        results = BNF().parse_string(s, parseAll=True)
         return "Success!", 0
     except:
         return "Parse Failed", -1
+
 
 if __name__ == "__main__":
 
     def test(s, expected, raw_score=None, data=None):
         exprStack[:] = []
         try:
-            val = parse(s,raw_score,data)
+            val = parse(s, raw_score, data)
             results = BNF().parseString(s, parseAll=True)
         except ParseException as pe:
             print(s, "failed parse:", str(pe))

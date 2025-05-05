@@ -6,13 +6,11 @@ from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 import numpy as np
 import redis
 
-##As a demo, using a miniLM to generate embeddings for each document, and then 
+##As a demo, using a miniLM to generate embeddings for each document, and then
 schema = (
     TextField("content"),
     TagField("genre"),
-    VectorField("embedding", "HNSW", {
-        "TYPE": "FLOAT32",
-        "DIM": 384,
-        "DISTANCE_METRIC":"L2"
-    })
+    VectorField(
+        "embedding", "HNSW", {"TYPE": "FLOAT32", "DIM": 384, "DISTANCE_METRIC": "L2"}
+    ),
 )

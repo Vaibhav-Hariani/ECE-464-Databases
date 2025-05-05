@@ -1,5 +1,5 @@
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select, delete
+from sqlalchemy import bindparam, select, delete, inspect, update
 import secrets
 from db_objects import *
 from curve_parser import apply_curve, get_raw_scores, test_parse
@@ -254,14 +254,110 @@ def new_assignment(course_id, assign_type: str, args: dict) -> tuple[Assignment,
 
 
 def assign_curve(obj: Courses | Assignment, curve_str) -> tuple[str, int]:
-        msg, result = test_parse(curve_str)
-        if result != 0:
-            return msg, result
-        with Session.begin() as session:
-            obj = session.merge(obj)
-            obj.curve = curve_str
-            session.commit()
-            return msg, result
+    msg, result = test_parse(curve_str)
+    if result != 0:
+        return msg, result
+    with Session.begin() as session:
+        obj = session.merge(obj)
+        obj.curve = curve_str
+        session.commit()
+        return msg, result
+
+
+## Courtesy of Gemini
+## Made significant modifications
+@event.listens_for(Assignment, "after_update")
+def assignment_after_update(mapper, connection, target: Assignment):
+    """
+    After an Assignment is updated, check if the curve changed.
+    If so, update the curved_score for all related AssignmentGrade records.
+    """
+    session = Session.object_session(target)
+    if not session:
+        # Cannot proceed without a session context
+        # This might happen in bulk updates outside a session flush context.
+        # Consider alternative strategies (like DB triggers) if this is a common case.
+        raise Exception(f"No Session found to update grades on assignment")
+
+    insp = inspect(target)
+    curve_history = insp.attrs.curve.history
+    weight_history = insp.attrs.weight.history
+
+    # Check if 'curve' was actually changed in this update
+    if curve_history.has_changes() or weight_history.has_changes():
+        assignment_id = target.id
+        new_curve = target.curve
+        new_weight = target.weight
+        print(
+            f"Curve changed for Assignment {assignment_id}. Updating related AssignmentGrade curved_scores..."
+        )
+
+        # --- Strategy: Fetch grades, calculate in Python, update in bulk ---
+        # This keeps curve logic in Python but requires fetching IDs and grades first.
+        stmt_select_grades = select(AssignmentGrade.id, AssignmentGrade.grade).where(
+            AssignmentGrade.assign_id == assignment_id
+        )
+
+        # Execute within the existing transaction context if possible
+        results = connection.execute(stmt_select_grades).fetchall()
+
+        if not results:
+            print(f"No AssignmentGrades found for Assignment {assignment_id}.")
+            return  # Nothing to update
+
+        updates = []
+
+        if curve_history.has_changes():
+            for grade_id, original_grade in results:
+                new_curved_score = new_weight * apply_curve(
+                    new_curve, original_grade, target
+                )
+                updates.append({"id": grade_id, "curved_score": new_curved_score})
+        else:
+            for grade_id, original_grade in results:
+                new_curved_score = new_weight * original_grade
+                updates.append({"id": grade_id, "curved_score": new_curved_score})
+
+        # Perform bulk update
+        # Note: Use connection directly as we are inside the event listener flush process
+        stmt_update = (
+            update(AssignmentGrade)
+            .where(AssignmentGrade.id == bindparam("_id"))
+            .values(curved_score=bindparam("curved_score"))
+        )
+
+        # Map the keys in `updates` to the bindparam names
+        bind_updates = [
+            {"_id": u["id"], "curved_score": u["curved_score"]} for u in updates
+        ]
+
+        connection.execute(stmt_update, bind_updates)
+        print(
+            f"Updated curved_score for {len(updates)} AssignmentGrade records for Assignment {assignment_id}."
+        )
+
+
+@event.listens_for(AssignmentGrade, "before_insert")
+@event.listens_for(AssignmentGrade, "before_update")
+def assignment_grade_before_save(mapper, connection, target: AssignmentGrade):
+    session = Session.object_session(target)
+    if not session:
+        print(
+            f"Warning: No session found for AssignmentGrade {target.id or '(new)'} during before_save. Cannot set curved_score."
+        )
+        return
+
+    # Check if 'grade' is set or being changed
+    insp = inspect(target)
+    grade_history = insp.attrs.grade.history
+    recalculate = (insp.transient or insp.pending) or grade_history.has_changes()
+    if recalculate:
+        parent_assignment = target.assignment
+        grade = target.grade
+        if grade is None:
+            grade = 0.0
+        new_score = apply_curve(parent_assignment.curve, grade, parent_assignment)
+        target.curved_score = parent_assignment.weight * new_score
 
 
 ##Depending on future work, may need to add ability to upload
@@ -304,6 +400,7 @@ def get_assignments(assigns: AssignSpec):
         assigns = session.merge(assigns)
         return assigns.assignments
 
+
 ##Uncurved grades
 def get_grades(
     course: Courses = None, assign_type: AssignSpec = None, assign: Assignment = None
@@ -323,7 +420,9 @@ def get_grades(
                 for student in students
             ]
         elif course:
-            raw_grades = [get_raw_scores(course, student.id, session) for student in students]
+            raw_grades = [
+                get_raw_scores(course, student.id, session) for student in students
+            ]
 
         raw_grades.sort()
         return raw_grades
@@ -340,13 +439,17 @@ def get_student_grade(
     if utype != "student":
         return ("Invalid User", 0)
     with Session() as session:
-        return get_raw_scores(course, uid, session)
+        course = session.merge(course)
+        scores = get_raw_scores(course, uid, session)
+        return scores
+
 
 def update_weight(obj, new_weight):
     with Session() as session:
         obj = session.merge(obj)
         obj.weight = new_weight
         session.commit()
+
 
 def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curve=True):
     uid = uid
