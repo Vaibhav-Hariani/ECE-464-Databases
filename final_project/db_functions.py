@@ -469,6 +469,20 @@ def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curv
             return apply_curve(curve, grade, assign)
         return grade
 
+# def grade_students(key, student_grades: dict[str, float], assignment:Assignment):
+#     user, utype = get_user(key)
+#     uid = user.id
+#     if utype != "professor":
+#         return ("Invalid User", 0)
+#     students = [sg[0] for sg in student_grades]
+#     with Session() as session:
+#         student_id_stmt = select(StudentData).where(StudentData.name.in_(students)).order_by(StudentData.id)
+#         students = session.execute(student_id_stmt).scalars
+#         grade_stmt = select(AssignmentGrade).where(AssignmentGrade.student_id.in_(ids)).order_by(AssignmentGrade.student_id)
+#         grade_boxes = session.execute(student_id_stmt).scalars
+#         for student in ids:
+#             grade = student_grades[]
+
 
 def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=True):
     uid = uid

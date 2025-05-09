@@ -80,12 +80,13 @@ def is_valid(obj):
     return False
 
 
+
 def stat_struct(kw, obj: Assignment | Courses):
     if obj.__table__ == Courses.__table__:
         with Session() as session:
             obj = session.merge(obj)
             students = obj.students
-            grades = [get_raw_scores(obj, student.id, session) for student in students]
+            grades = [aggregate_score(obj, student.id, session) for student in students]
         return course_funcs[kw](grades)
     ##Behavior for assignments and assignments only
     if kw == "range":
@@ -100,32 +101,55 @@ def stat_struct(kw, obj: Assignment | Courses):
         return 0
     return data
 
+def aggregate_score(course: Courses, session):  # type: ignore
+    assignment_breakdown_kv = {}
+    student_table = {student.id: 0 for student in course.students}
+    total_breakdown = course.course_breakdown
+    for breakdown in total_breakdown:
+        assignments = breakdown.assignments
+        for assign in assignments:
+            assignment_breakdown_kv[assign.id] = breakdown.weight
 
-def get_scores(course: Courses):
-    with Session() as session:
-        course = session.merge(course)
-        students = course.students
-        grades = [get_raw_scores(course, student.id, session) for student in students]
-        return grades
+    assign_ids = list(assignment_breakdown_kv.keys())
+    student_ids = list(student_table.keys())
+
+    grade = 0.0
+    stmt = select(AssignmentGrade.student_id, AssignmentGrade.assign_id, AssignmentGrade.curved_score).where(
+        AssignmentGrade.student_id.in_(student_ids),
+        AssignmentGrade.assign_id.in_(assign_ids)
+    )  # Eager load Assignment for curve
+    rows = session.execute(stmt).fetchall()
+
+    for row in rows:
+        student_table[row.student_id] += row.curved_score * assignment_breakdown_kv[row.assign_id]
+    return grade
 
 
 def get_raw_scores(course: Courses, uid: int, session):  # type: ignore
-    breakdown = course.course_breakdown
+    assignment_breakdown_kv = {}
+
+    for breakdown in course.course_breakdown:
+        for assign in breakdown.assignments:
+            assignment_breakdown_kv[assign.id] = breakdown.weight
+        # ids = [assign.id for assign in breakdown.assignments]
+        # breakdown_weight_kv[breakdown.id] = breakdown.weight
+        # assignment_breakdown_kv[]
+        # spec_ids.append(breakdown.id)
+        # assignment_ids += ids
+
+    # spec_ids = breakdown_dict.keys
+
+    # breakdown = course.course_breakdown
+    assign_ids = list(assignment_breakdown_kv.keys())
     grade = 0.0
-    for spec in breakdown:
-        weight = spec.weight
-        assignments = spec.assignments
-        assignment_ids = [assign.id for assign in assignments]
-        # curve = assign.curve
-        # lweight = assign.weight
-        stmt = select(func.sum(AssignmentGrade.curved_score)).where(
-            AssignmentGrade.student_id == uid,
-            AssignmentGrade.assign_id.in_(assignment_ids),
-        )  # Eager load Assignment for curve
-        grades = session.execute(stmt).scalars().one_or_none()
-        if grades is None:
-            grades = 0
-        grade += weight * grades
+    stmt = select(AssignmentGrade.assign_id, AssignmentGrade.curved_score).where(
+        AssignmentGrade.student_id == uid,
+        AssignmentGrade.assign_id.in_(assign_ids)
+    )  # Eager load Assignment for curve
+    rows = session.execute(stmt).fetchall()
+
+    for row in rows:
+        grade += row.curved_score * assignment_breakdown_kv[row.assign_id]
     return grade
 
 

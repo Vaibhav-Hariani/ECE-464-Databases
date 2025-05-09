@@ -3,6 +3,25 @@ from db_functions import *
 from db_objects import *
 
 
+
+def hash_courses(obj: Courses):
+    return str(obj.id) + obj.curve
+
+def hash_assign(obj: Assignment):
+    return str(obj.id) + obj.curve + str(obj.weight)
+
+def hash_assignspec(obj: AssignSpec):
+    return str(obj.id) + str(obj.weight)
+
+##Cache doesn't need to grow too large
+@st.cache_data(hash_funcs={Courses: hash_courses, Assignment: hash_assign, AssignSpec: hash_assignspec},max_entries=5)
+def cached_get_grades(course,assign_type,assignment):
+    return get_grades(course,assign_type,assignment)    
+
+def st_weight_adj(obj, new_weight):
+    cached_get_grades.clear()
+    update_weight(obj,new_weight)
+
 def professor_courseman(key: SessionToken):
     courses, archetypes, semesters, status = get_prof_courses(key)
     running_i = []
@@ -76,7 +95,7 @@ def professor_courseman(key: SessionToken):
                 except:
                     st.error("Invalid Input for weight")
 
-            raw_grades = get_grades(course, assign_type, assignment)
+            raw_grades = cached_get_grades(course, assign_type, assignment)
 
             cols = st.columns(num_cols)
             # st.write("Something")
@@ -99,7 +118,6 @@ def professor_courseman(key: SessionToken):
                         st.error(
                             "Curve Failed to Apply: For a guide, check ****. Remember, X should be the only variable."
                         )
-
 
 def student_courseman(user: StudentData):
     st.write("Coming Soon!")

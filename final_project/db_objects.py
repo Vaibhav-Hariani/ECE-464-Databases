@@ -213,7 +213,7 @@ class AssignmentGrade(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     assignment: Mapped["Assignment"] = relationship(back_populates="submissions")
     assign_id: Mapped[int] = mapped_column(ForeignKey("assignment.id"))
-    grade: Mapped[float] = mapped_column(default=0.0)
+    grade: Mapped[Optional[float]] = mapped_column()
     submitted: Mapped[bool] = mapped_column(default=False)
     time_submitted: Mapped[Optional[datetime.datetime]]
     student_id = mapped_column(ForeignKey("student_data.id"))

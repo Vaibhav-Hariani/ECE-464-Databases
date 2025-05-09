@@ -163,7 +163,6 @@ if __name__ == "__main__":
     Students = db_functions.table_loader(StudentData)
     for student in Students:
         print(student.name)
-        print("Done printing students")
     populate_professors()
     Professors = db_functions.table_loader(ProfessorData)
     for prof in Professors:
