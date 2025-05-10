@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import bindparam, select, delete, inspect, update
 import secrets
 from db_objects import *
-from curve_parser import apply_curve, get_raw_scores, test_parse
+from curve_parser import apply_curve, get_raw_scores, test_parse, parse_batch
 from typing import TypeVar
 
 ##For analyzing return types:

@@ -106,9 +106,7 @@ def professor_courseman(key: SessionToken):
             if enabled:
                 with cols[1]:
                     try:
-                        curved_grades = [
-                            apply_curve(curve, score, data) for score in raw_grades
-                        ]
+                        curved_grades = parse_batch(curve, raw_grades, data)
                         st.line_chart(
                             curved_grades,
                             x_label="Students (Sorted)",
