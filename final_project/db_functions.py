@@ -2,7 +2,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import bindparam, select, delete, inspect, update
 import secrets
 from db_objects import *
-from curve_parser import apply_curve, get_raw_scores, aggregate_score, test_parse
+from curve_parser import (
+    apply_curve,
+    get_raw_scores,
+    aggregate_score,
+    test_parse,
+    parse_batch,
+)
 from typing import TypeVar
 
 ##For analyzing return types:
@@ -410,31 +416,41 @@ def get_grades(
         students = course.students
         raw_grades = []
         if assign or assign_type:
-            raw_grades = [get_student_grade(None,course,assign_type,assign,use_curve=False,uid=student.id) for student in students]
+            raw_grades = [
+                get_student_grade(
+                    None, course, assign_type, assign, use_curve=False, uid=student.id
+                )
+                for student in students
+            ]
         elif course:
-            raw_grades = aggregate_score(course,session)
+            raw_grades = aggregate_score(course, session)
         raw_grades.sort()
         return raw_grades
 
 
 def get_student_grade(
-    key: str | None, course: Courses, assign_type=None,
-    assign=None, use_curve=False, uid=None
+    key: str | None,
+    course: Courses,
+    assign_type=None,
+    assign=None,
+    use_curve=False,
+    uid=None,
 ) -> float:
     with Session() as session:
         if uid is None:
             user, utype = get_user(key, session)
             uid = user.id
         if assign:
-            return get_assignment_grade(None, assign, uid,use_curve=use_curve)
+            return get_assignment_grade(None, assign, uid, use_curve=use_curve)
         elif assign_type:
-            return get_category_grade(None, assign_type, uid,use_curve=use_curve)
+            return get_category_grade(None, assign_type, uid, use_curve=use_curve)
         elif course:
             course = session.merge(course)
             grade = get_raw_scores(course, uid, session)
-            if use_curve: 
-                grade = apply_curve(course.curve,grade,course)
+            if use_curve:
+                grade = apply_curve(course.curve, grade, course)
             return grade
+
 
 def update_weight(obj, new_weight):
     with Session() as session:
@@ -462,7 +478,10 @@ def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curv
             return apply_curve(curve, grade, assign)
         return grade
 
-def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=True) -> float:
+
+def get_category_grade(
+    key: str | None, spec: AssignSpec, uid=None, use_curve=True
+) -> float:
     with Session() as session:
         uid = uid
         utype = "student"
@@ -479,24 +498,32 @@ def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=Tr
             grade += lgrade
         return grade
 
+
 def get_submission(key: str, assign: Assignment) -> AssignmentGrade:
     with Session() as session:
         user, utype = get_user(key, session)
         if utype != "student":
             return ("Invalid User", 0)
-        stmt = select(AssignmentGrade).where(AssignmentGrade.assign_id==assign.id,AssignmentGrade.student_id==user.id)
+        stmt = select(AssignmentGrade).where(
+            AssignmentGrade.assign_id == assign.id,
+            AssignmentGrade.student_id == user.id,
+        )
         return session.execute(stmt).scalar_one_or_none()
+
 
 def get_work(obj: AssignmentGrade):
     with Session() as session:
         obj = session.merge(obj)
-        if(obj.submission):
+        if obj.submission:
             return obj.submission.raw_data, obj.submission.signature
     return None
+
+
 ##Grades are stored in 0-100 format.
 ##This needs to take those values, and curve them according to
 
-def submit_work(key: str, grade: AssignmentGrade, work,signature):
+
+def submit_work(key: str, grade: AssignmentGrade, work, signature):
     with Session.begin() as session:
         grade = session.merge(grade)
         # if grade.submitted:
@@ -504,11 +531,12 @@ def submit_work(key: str, grade: AssignmentGrade, work,signature):
         #     submission.raw_data = work
         # else:
         bytes = work.read()
-        data = AssignmentGradeData(assign_id=grade.id,raw_data=bytes,signature=signature)
+        data = AssignmentGradeData(
+            assign_id=grade.id, raw_data=bytes, signature=signature
+        )
         session.add(data)
         grade.submitted = True
         grade.time_submitted = get_time()
-
 
 
 def get_time():
@@ -534,7 +562,7 @@ def get_courses(
 
 def reg_student(key: str, course_data: dict | None = None, course_id=None):
     with Session.begin() as session:
-        student = get_user(key,session)[0]
+        student = get_user(key, session)[0]
 
         student = session.merge(student)
         if course_id is None:
@@ -598,6 +626,7 @@ def get_user(key: str, session) -> tuple[StudentData | ProfessorData | DeanData,
     extend_token(token, session)
     usrtype = Tables[login.type]
     return session.get(usrtype, login.uid), login.type
+
 
 ##These functions are just for testing
 def get_login(uid, type) -> Login:

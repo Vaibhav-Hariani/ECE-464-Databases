@@ -3,31 +3,41 @@ from db_functions import *
 from db_objects import *
 
 
-
 def hash_courses(obj: Courses):
     if obj:
         return str(obj.id) + obj.curve
-    return 'None'
+    return "None"
+
 
 def hash_assign(obj: Assignment):
     if obj:
         return str(obj.id) + obj.curve + str(obj.weight)
-    return 'None'
+    return "None"
+
 
 def hash_assignspec(obj: AssignSpec):
     if obj:
         return str(obj.id) + str(obj.weight)
-    return 'None'
+    return "None"
+
 
 ##Cache doesn't need to grow too large
-@st.cache_data(hash_funcs={Courses: hash_courses, Assignment: hash_assign, AssignSpec: hash_assignspec},max_entries=5)
-def cached_get_grades(course,assign_type,assignment):
-    return get_grades(course,assign_type,assignment)    
+@st.cache_data(
+    hash_funcs={
+        Courses: hash_courses,
+        Assignment: hash_assign,
+        AssignSpec: hash_assignspec,
+    },
+    max_entries=5,
+)
+def cached_get_grades(course, assign_type, assignment):
+    return get_grades(course, assign_type, assignment)
 
 
 def st_weight_adj(obj, new_weight):
     cached_get_grades.clear()
-    update_weight(obj,new_weight)
+    update_weight(obj, new_weight)
+
 
 def professor_courseman(key: str):
     courses, archetypes, semesters, status = get_courses(key)
@@ -124,6 +134,7 @@ def professor_courseman(key: str):
                             "Curve Failed to Apply: For a guide, check ****. Remember, X should be the only variable."
                         )
 
+
 def student_courseman(key: str):
     courses, archetypes, semesters, status = get_courses(key)
     running_i = []
@@ -162,7 +173,7 @@ def student_courseman(key: str):
             raw_grade = get_student_grade(key, course, assign_type, assignment)
             st.write(f"Your raw grade in this category is {raw_grade:0.2f}")
             if assignment:
-                assignment_grade = get_submission(key,assignment)
+                assignment_grade = get_submission(key, assignment)
                 label = "Submit Work"
                 if assignment_grade.submitted:
                     label = "Resubmit Work"
@@ -170,13 +181,18 @@ def student_courseman(key: str):
                     if submitted_work:
                         work, signature = submitted_work
                         st.warning("You've already submitted work for this assignment")
-                        st.download_button("Download Your Submission", work,file_name=f"{signature}")
+                        st.download_button(
+                            "Download Your Submission", work, file_name=f"{signature}"
+                        )
                     ##Allow users to download their own submission
                 submission = st.file_uploader(label)
                 if submission:
                     signature = submission.name
-                    st.button("Submit Work", on_click=submit_work,args=(key,assignment_grade, submission,signature))
-
+                    st.button(
+                        "Submit Work",
+                        on_click=submit_work,
+                        args=(key, assignment_grade, submission, signature),
+                    )
 
 
 def dean_courseman(user: DeanData):

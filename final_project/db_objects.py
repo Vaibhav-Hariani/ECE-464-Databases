@@ -227,6 +227,7 @@ class AssignmentGrade(Base):
         # Index('ix_course_semester', 'course_id', 'semester_id'),
     )
 
+
 class AssignmentGradeData(Base):
     __tablename__ = "submission_blob"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -234,6 +235,7 @@ class AssignmentGradeData(Base):
     assign_id: Mapped[int] = mapped_column(ForeignKey("assignment_grade.id"))
     raw_data: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
     signature: Mapped[str]
+
 
 def set_session_time():
     return datetime.datetime.now() + datetime.timedelta(hours=2)

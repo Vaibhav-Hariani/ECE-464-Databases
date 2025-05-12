@@ -17,7 +17,8 @@ def add_password():
     passw += random.choice(random_punct)
     return passw
 
-def create_stu(element, fname, lname,passw=None):
+
+def create_stu(element, fname, lname, passw=None):
     username = fname + "_" + lname
     email = username + "@copperonion.edu"
     element["name"] = fname + " " + lname
@@ -88,7 +89,7 @@ def random_student(element):
     ]
     fname = random.choice(first_names)
     lname = random.choice(last_names)
-    create_stu(element,fname,lname)
+    create_stu(element, fname, lname)
 
 
 def populate_students(NUM_STUDENTS=21):
@@ -97,11 +98,20 @@ def populate_students(NUM_STUDENTS=21):
         random_student(element)
         response = db_functions.create_user(element)
         print(response)
-    for student in [("Jacob", "Koziej"), ("Joya", "Debi"), ("Isaiah", "Rivera"), ("Nick", "Storniolo"), ("Evan" ,"Rosenfeld"), ("Alek", "Turkmen"), ("Grace", "Ee"), ("Surinderpal", "Singh")]:
+    for student in [
+        ("Jacob", "Koziej"),
+        ("Joya", "Debi"),
+        ("Isaiah", "Rivera"),
+        ("Nick", "Storniolo"),
+        ("Evan", "Rosenfeld"),
+        ("Alek", "Turkmen"),
+        ("Grace", "Ee"),
+        ("Surinderpal", "Singh"),
+    ]:
         fname = student[0]
         lname = student[1]
-        passw= "databases"
-        create_stu(element,fname,lname,passw)
+        passw = "databases"
+        create_stu(element, fname, lname, passw)
         response = db_functions.create_user(element)
         print(response)
 
@@ -190,9 +200,12 @@ if __name__ == "__main__":
     grades = db_functions.table_loader(AssignmentGrade)
     [db_functions.submit(token, assignment) for token in tokens]
 
-    assign_args = {"weight": 0.5, "name": "Midterm", "due_date": db_functions.get_time()}
+    assign_args = {
+        "weight": 0.5,
+        "name": "Midterm",
+        "due_date": db_functions.get_time(),
+    }
     assignment, status = db_functions.new_assignment(course.id, "Exams", assign_args)
-
 
     for token in tokens:
         print(db_functions.get_student_grade(token, course))

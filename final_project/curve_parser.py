@@ -80,7 +80,6 @@ def is_valid(obj):
     return False
 
 
-
 def stat_struct(kw, obj: Assignment | Courses):
     if obj.__table__ == Courses.__table__:
         with Session() as session:
@@ -101,6 +100,7 @@ def stat_struct(kw, obj: Assignment | Courses):
         return 0
     return data
 
+
 def aggregate_score(course: Courses, session):  # type: ignore
     assignment_breakdown_kv = {}
     student_table = {student.id: 0 for student in course.students}
@@ -114,14 +114,20 @@ def aggregate_score(course: Courses, session):  # type: ignore
     student_ids = list(student_table.keys())
 
     grade = 0.0
-    stmt = select(AssignmentGrade.student_id, AssignmentGrade.assign_id, AssignmentGrade.curved_score).where(
+    stmt = select(
+        AssignmentGrade.student_id,
+        AssignmentGrade.assign_id,
+        AssignmentGrade.curved_score,
+    ).where(
         AssignmentGrade.student_id.in_(student_ids),
-        AssignmentGrade.assign_id.in_(assign_ids)
+        AssignmentGrade.assign_id.in_(assign_ids),
     )  # Eager load Assignment for curve
     rows = session.execute(stmt).fetchall()
 
     for row in rows:
-        student_table[row.student_id] += row.curved_score * assignment_breakdown_kv[row.assign_id]
+        student_table[row.student_id] += (
+            row.curved_score * assignment_breakdown_kv[row.assign_id]
+        )
     grades = list(student_table.values())
     return grades
 
@@ -136,8 +142,7 @@ def get_raw_scores(course: Courses, uid: int, session):  # type: ignore
     assign_ids = list(assignment_breakdown_kv.keys())
     grade = 0.0
     stmt = select(AssignmentGrade.assign_id, AssignmentGrade.curved_score).where(
-        AssignmentGrade.student_id == uid,
-        AssignmentGrade.assign_id.in_(assign_ids)
+        AssignmentGrade.student_id == uid, AssignmentGrade.assign_id.in_(assign_ids)
     )  # Eager load Assignment for curve
     rows = session.execute(stmt).fetchall()
 
@@ -285,17 +290,18 @@ def parse(s, raw_score=None, data=None):
     results = BNF().parseString(s, parseAll=True)
     for element in exprStack:
         if element in stats and is_valid(data):
-            element = stat_struct(element,data)
-        
+            element = stat_struct(element, data)
+
     val = evaluate_stack(exprStack[:], raw_score, data)
     return val
+
 
 def parse_batch(s, scores=None, data=None):
     exprStack[:] = []
     results = BNF().parseString(s, parseAll=True)
     for element in exprStack:
         if element in stats and is_valid(data):
-            element = stat_struct(element,data)
+            element = stat_struct(element, data)
 
     vals = [evaluate_stack(exprStack[:], score, data) for score in scores]
     return vals
