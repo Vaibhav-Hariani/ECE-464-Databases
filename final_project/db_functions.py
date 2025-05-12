@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import bindparam, select, delete, inspect, update
 import secrets
 from db_objects import *
-from curve_parser import apply_curve, get_raw_scores, test_parse, parse_batch
+from curve_parser import apply_curve, get_raw_scores, aggregate_score, test_parse
 from typing import TypeVar
 
 ##For analyzing return types:
@@ -124,12 +124,11 @@ def get_semester(semester_id) -> tuple[List[Semesters], int]:
 
 ##Course Creation
 def create_gen_course(key: str, courseinfo: dict) -> tuple[Courses, int]:
-    user, utype = get_user(key)
     course_name = courseinfo["name"]
     course_code = courseinfo["course_code"]
     with Session() as session:
+        user, utype = get_user(key, session)
         try:
-            user, utype = get_user(key)
             if utype != "dean" and utype != "professor":
                 return ("You Should not have permission to access this resource!", -2)
             major_id = user.major_id
@@ -165,7 +164,7 @@ def create_course_instance(courseinfo: dict, key: str) -> tuple[Courses, int]:
     get_arch = select(CourseArchetype).where(CourseArchetype.course_code == course_code)
     try:
         with Session.begin() as session:
-            user, utype = get_user(key)
+            user, utype = get_user(key, session)
             if utype != "professor":
                 return ("You Should not have permission to access this resource!", -2)
             arch = session.execute(get_arch).fetchone()
@@ -362,10 +361,10 @@ def assignment_grade_before_save(mapper, connection, target: AssignmentGrade):
 
 ##Depending on future work, may need to add ability to upload
 def submit(token: str, assignment: Assignment) -> tuple[String, int]:
-    user, utype = get_user(token)
-    if utype != "student":
-        return ("Not a Student", -2)
     with Session.begin() as session:
+        user, utype = get_user(token, session)
+        if utype != "student":
+            return ("Not a Student", -2)
         stmt = select(AssignmentGrade).where(
             AssignmentGrade.student_id == user.id,
             AssignmentGrade.assign_id == assignment.id,
@@ -377,10 +376,11 @@ def submit(token: str, assignment: Assignment) -> tuple[String, int]:
 
 
 def grade(key: str, submission: AssignmentGrade, grade) -> tuple[AssignmentGrade, int]:
-    user, utype = get_user(key)
-    if utype != "professor":
-        return ("Not a Professor", -2)
     with Session() as session:
+        user, utype = get_user(key, session)
+        if utype != "professor":
+            return ("Not a Professor", -2)
+
         submission = session.merge(submission)
         submission.submitted = True
         submission.grade = grade
@@ -409,40 +409,32 @@ def get_grades(
         course = session.merge(course)
         students = course.students
         raw_grades = []
-        if assign:
-            raw_grades = [
-                get_assignment_grade(None, assign, student.id, use_curve=False)
-                for student in students
-            ]
-        elif assign_type:
-            raw_grades = [
-                get_category_grade(None, assign_type, student.id, use_curve=False)
-                for student in students
-            ]
+        if assign or assign_type:
+            raw_grades = [get_student_grade(None,course,assign_type,assign,use_curve=False,uid=student.id) for student in students]
         elif course:
-            raw_grades = [
-                get_raw_scores(course, student.id, session) for student in students
-            ]
-
+            raw_grades = aggregate_score(course,session)
         raw_grades.sort()
         return raw_grades
 
 
 def get_student_grade(
-    key: str | None, course: Courses, uid=None
-) -> tuple[float | str, int]:
-    uid = uid
-    utype = "student"
-    if uid is None:
-        user, utype = get_user(key)
-        uid = user.id
-    if utype != "student":
-        return ("Invalid User", 0)
+    key: str | None, course: Courses, assign_type=None,
+    assign=None, use_curve=False, uid=None
+) -> float:
     with Session() as session:
-        course = session.merge(course)
-        scores = get_raw_scores(course, uid, session)
-        return scores
-
+        if uid is None:
+            user, utype = get_user(key, session)
+            uid = user.id
+        if assign:
+            return get_assignment_grade(None, assign, uid,use_curve=use_curve)
+        elif assign_type:
+            return get_category_grade(None, assign_type, uid,use_curve=use_curve)
+        elif course:
+            course = session.merge(course)
+            grade = get_raw_scores(course, uid, session)
+            if use_curve: 
+                grade = apply_curve(course.curve,grade,course)
+            return grade
 
 def update_weight(obj, new_weight):
     with Session() as session:
@@ -454,12 +446,13 @@ def update_weight(obj, new_weight):
 def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curve=True):
     uid = uid
     utype = "student"
-    if uid is None:
-        user, utype = get_user(key)
-        uid = user.id
-    if utype != "student":
-        return ("Invalid User", 0)
     with Session() as session:
+        if uid is None:
+            user, utype = get_user(key, session)
+            uid = user.id
+        if utype != "student":
+            return ("Invalid User", 0)
+
         curve = assign.curve
         stmt = select(AssignmentGrade.grade).where(
             AssignmentGrade.student_id == uid, AssignmentGrade.assign_id == assign.id
@@ -469,30 +462,15 @@ def get_assignment_grade(key: str | None, assign: Assignment, uid=None, use_curv
             return apply_curve(curve, grade, assign)
         return grade
 
-# def grade_students(key, student_grades: dict[str, float], assignment:Assignment):
-#     user, utype = get_user(key)
-#     uid = user.id
-#     if utype != "professor":
-#         return ("Invalid User", 0)
-#     students = [sg[0] for sg in student_grades]
-#     with Session() as session:
-#         student_id_stmt = select(StudentData).where(StudentData.name.in_(students)).order_by(StudentData.id)
-#         students = session.execute(student_id_stmt).scalars
-#         grade_stmt = select(AssignmentGrade).where(AssignmentGrade.student_id.in_(ids)).order_by(AssignmentGrade.student_id)
-#         grade_boxes = session.execute(student_id_stmt).scalars
-#         for student in ids:
-#             grade = student_grades[]
-
-
-def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=True):
-    uid = uid
-    utype = "student"
-    if uid is None:
-        user, utype = get_user(key)
-        uid = user.id
-    if utype != "student":
-        return ("Invalid User", 0)
+def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=True) -> float:
     with Session() as session:
+        uid = uid
+        utype = "student"
+        if uid is None:
+            user, utype = get_user(key, session)
+            uid = user.id
+        if utype != "student":
+            return ("Invalid User", 0)
         assign_list = session.merge(spec).assignments
         grade = 0
         for assign in assign_list:
@@ -501,9 +479,36 @@ def get_category_grade(key: str | None, spec: AssignSpec, uid=None, use_curve=Tr
             grade += lgrade
         return grade
 
+def get_submission(key: str, assign: Assignment) -> AssignmentGrade:
+    with Session() as session:
+        user, utype = get_user(key, session)
+        if utype != "student":
+            return ("Invalid User", 0)
+        stmt = select(AssignmentGrade).where(AssignmentGrade.assign_id==assign.id,AssignmentGrade.student_id==user.id)
+        return session.execute(stmt).scalar_one_or_none()
 
+def get_work(obj: AssignmentGrade):
+    with Session() as session:
+        obj = session.merge(obj)
+        if(obj.submission):
+            return obj.submission.raw_data, obj.submission.signature
+    return None
 ##Grades are stored in 0-100 format.
 ##This needs to take those values, and curve them according to
+
+def submit_work(key: str, grade: AssignmentGrade, work,signature):
+    with Session.begin() as session:
+        grade = session.merge(grade)
+        # if grade.submitted:
+        #     submission = grade.submission
+        #     submission.raw_data = work
+        # else:
+        bytes = work.read()
+        data = AssignmentGradeData(assign_id=grade.id,raw_data=bytes,signature=signature)
+        session.add(data)
+        grade.submitted = True
+        grade.time_submitted = get_time()
+
 
 
 def get_time():
@@ -511,13 +516,12 @@ def get_time():
 
 
 ##Course management
-def get_prof_courses(
+def get_courses(
     key: str,
 ) -> tuple[List[Courses], List[CourseArchetype], List[Semesters], int]:
-    user, utype = get_user(key)
     with Session() as session:
-        user = session.merge(user)
-        if utype != "professor":
+        user, utype = get_user(key, session)
+        if utype == "dean":
             return "Invalid UserType"
         courses = user.courses
         archetypes = []
@@ -529,8 +533,9 @@ def get_prof_courses(
 
 
 def reg_student(key: str, course_data: dict | None = None, course_id=None):
-    student = get_user(key)[0]
     with Session.begin() as session:
+        student = get_user(key,session)[0]
+
         student = session.merge(student)
         if course_id is None:
             course = get_course(course_data)
@@ -555,7 +560,7 @@ def login(uname, password) -> tuple[SessionToken, int]:
             session.delete(login.token)
             create_session_token(login, session)
         else:
-            extend_token(login.token)
+            extend_token(login.token, session)
     return (login.token, login.type, 0)
 
 
@@ -581,21 +586,18 @@ def get_token(key: str, session) -> SessionToken:
     return token
 
 
-def extend_token(token: SessionToken):
+def extend_token(token: SessionToken, session):
     token.expires_at += datetime.timedelta(hours=2)
 
 
-def get_user(key: str) -> tuple[StudentData | ProfessorData | DeanData, str]:
-    with Session() as session:
-        token = get_token(key, session)
-        if token.is_expired():
-            raise ExpiredToken("Token Invalid")
-        login = token.login
-        extend_token(token)
-        session.commit()
-        usrtype = Tables[login.type]
-        return session.get(usrtype, login.uid), login.type
-
+def get_user(key: str, session) -> tuple[StudentData | ProfessorData | DeanData, str]:
+    token = get_token(key, session)
+    if token.is_expired():
+        raise ExpiredToken("Token Invalid")
+    login = token.login
+    extend_token(token, session)
+    usrtype = Tables[login.type]
+    return session.get(usrtype, login.uid), login.type
 
 ##These functions are just for testing
 def get_login(uid, type) -> Login:

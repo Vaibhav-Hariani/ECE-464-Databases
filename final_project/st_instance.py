@@ -27,6 +27,8 @@ def db_login(username, password):
         st.session_state["st_login"] = True
         st.session_state["st_token"] = login_details[0]
         st.session_state["st_utype"] = login_details[1]
+        st.session_state["name"] = username
+
         return True
     else:
         return False
@@ -77,6 +79,8 @@ if __name__ == "__main__":
             st.session_state["st_login"] = False
             st.session_state["st_token"] = 0
             st.session_state["st_utype"] = None
+            st.session_state["name"] = None
+
         runner()
     else:
         sys.argv = [

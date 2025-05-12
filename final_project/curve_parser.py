@@ -86,7 +86,7 @@ def stat_struct(kw, obj: Assignment | Courses):
         with Session() as session:
             obj = session.merge(obj)
             students = obj.students
-            grades = [aggregate_score(obj, student.id, session) for student in students]
+            grades = aggregate_score(obj, session)
         return course_funcs[kw](grades)
     ##Behavior for assignments and assignments only
     if kw == "range":
@@ -122,7 +122,8 @@ def aggregate_score(course: Courses, session):  # type: ignore
 
     for row in rows:
         student_table[row.student_id] += row.curved_score * assignment_breakdown_kv[row.assign_id]
-    return grade
+    grades = list(student_table.values())
+    return grades
 
 
 def get_raw_scores(course: Courses, uid: int, session):  # type: ignore
