@@ -19,6 +19,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 from sqlalchemy.engine import URL
+from sqlalchemy.types import LargeBinary
 
 # basedir = os.path.abspath(os.path.dirname(__file__))
 # For Sqllite: Unsupported for some funcs or blobs.
@@ -76,7 +77,7 @@ class StudentData(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
-    reg_courses: Mapped[List["Courses"]] = relationship(
+    courses: Mapped[List["Courses"]] = relationship(
         secondary=student_course_assoc, back_populates="students"
     )
     submissions: Mapped[List["AssignmentGrade"]] = relationship(
@@ -154,7 +155,7 @@ class Courses(Base):
     course_breakdown: Mapped[List["AssignSpec"]] = relationship(back_populates="course")
     curve: Mapped[Optional[str]]
     students: Mapped[set["StudentData"]] = relationship(
-        secondary=student_course_assoc, back_populates="reg_courses"
+        secondary=student_course_assoc, back_populates="courses"
     )
 
     __table_args__ = (
@@ -218,6 +219,7 @@ class AssignmentGrade(Base):
     time_submitted: Mapped[Optional[datetime.datetime]]
     student_id = mapped_column(ForeignKey("student_data.id"))
     student: Mapped["StudentData"] = relationship(back_populates="submissions")
+    submission: Mapped["AssignmentGradeData"] = relationship(back_populates="assign")
     curved_score: Mapped[int] = mapped_column(default=0.0)
     __table_args__ = (
         UniqueConstraint("student_id", "assign_id", name="uq_submissions"),
@@ -225,6 +227,13 @@ class AssignmentGrade(Base):
         # Index('ix_course_semester', 'course_id', 'semester_id'),
     )
 
+class AssignmentGradeData(Base):
+    __tablename__ = "submission_blob"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    assign: Mapped["AssignmentGrade"] = relationship(back_populates="submission")
+    assign_id: Mapped[int] = mapped_column(ForeignKey("assignment_grade.id"))
+    raw_data: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
+    signature: Mapped[str]
 
 def set_session_time():
     return datetime.datetime.now() + datetime.timedelta(hours=2)
