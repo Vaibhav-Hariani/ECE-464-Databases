@@ -132,15 +132,7 @@ def get_raw_scores(course: Courses, uid: int, session):  # type: ignore
     for breakdown in course.course_breakdown:
         for assign in breakdown.assignments:
             assignment_breakdown_kv[assign.id] = breakdown.weight
-        # ids = [assign.id for assign in breakdown.assignments]
-        # breakdown_weight_kv[breakdown.id] = breakdown.weight
-        # assignment_breakdown_kv[]
-        # spec_ids.append(breakdown.id)
-        # assignment_ids += ids
 
-    # spec_ids = breakdown_dict.keys
-
-    # breakdown = course.course_breakdown
     assign_ids = list(assignment_breakdown_kv.keys())
     grade = 0.0
     stmt = select(AssignmentGrade.assign_id, AssignmentGrade.curved_score).where(
@@ -291,8 +283,22 @@ def evaluate_stack(s, raw_score, data=None):
 def parse(s, raw_score=None, data=None):
     exprStack[:] = []
     results = BNF().parseString(s, parseAll=True)
+    for element in exprStack:
+        if element in stats and is_valid(data):
+            element = stat_struct(element,data)
+        
     val = evaluate_stack(exprStack[:], raw_score, data)
     return val
+
+def parse_batch(s, scores=None, data=None):
+    exprStack[:] = []
+    results = BNF().parseString(s, parseAll=True)
+    for element in exprStack:
+        if element in stats and is_valid(data):
+            element = stat_struct(element,data)
+
+    vals = [evaluate_stack(exprStack[:], score, data) for score in scores]
+    return vals
 
 
 def test_parse(s):
