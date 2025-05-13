@@ -22,14 +22,14 @@ def hash_assignspec(obj: AssignSpec):
 
 
 ##Cache doesn't need to grow too large
-@st.cache_data(
-    hash_funcs={
-        Courses: hash_courses,
-        Assignment: hash_assign,
-        AssignSpec: hash_assignspec,
-    },
-    max_entries=5,
-)
+# @st.cache_data(
+#     hash_funcs={
+#         Courses: hash_courses,
+#         Assignment: hash_assign,
+#         AssignSpec: hash_assignspec,
+#     },
+#     max_entries=1,
+# )
 def cached_get_grades(course, assign_type, assignment):
     return get_grades(course, assign_type, assignment)
 
